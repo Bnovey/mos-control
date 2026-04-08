@@ -52,8 +52,8 @@ setInterval(async () => {
   --border:     #e2e8f0;
   --input-bg:   #f8fafc;
   --input-border:#cbd5e1;
-  --radius:     10px;
-  --radius-sm:  6px;
+  --radius:     0px;
+  --radius-sm:  0px;
   --sidebar-w:  60px;
 }
 * { box-sizing:border-box; margin:0; padding:0; }
@@ -66,39 +66,38 @@ body {
 
 ::-webkit-scrollbar { width:6px; height:6px; }
 ::-webkit-scrollbar-track { background:transparent; }
-::-webkit-scrollbar-thumb { background:#c1cfe0; border-radius:3px; }
+::-webkit-scrollbar-thumb { background:#c1cfe0; }
 ::-webkit-scrollbar-thumb:hover { background:#94a3b8; }
 
 /* LAYOUT */
 .app        { display:flex; flex-direction:column; height:100vh; }
 .topbar     { display:flex; align-items:center; justify-content:space-between;
               padding:10px 20px; border-bottom:1px solid var(--border);
-              background:#ffffff; backdrop-filter:blur(20px);
-              flex-shrink:0; z-index:10; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+              background:#ffffff;
+              flex-shrink:0; z-index:10; }
 .topbar h1  { font-size:16px; font-weight:700; display:flex; align-items:center; gap:10px; }
-.topbar .logo { width:30px;height:30px;border-radius:8px;background:var(--accent);
+.topbar .logo { width:30px;height:30px;background:var(--accent);
                 display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff; }
 .topbar-right { display:flex; align-items:center; gap:16px; }
 .status-row { display:flex; gap:10px; align-items:center; }
 .indicator { display:flex; align-items:center; gap:4px; font-size:11px; font-weight:600;
              color:var(--text3); }
-.indicator .dot { width:8px;height:8px;border-radius:50%;background:#cbd5e1;
+.indicator .dot { width:8px;height:8px;border-radius:50%;background:#cbd5e1;  /* keep round */
                   transition:background .2s; }
-.indicator.on .dot  { background:var(--green); box-shadow:0 0 6px var(--green-glow); }
+.indicator.on .dot  { background:var(--green); }
 .indicator.on       { color:var(--green); }
 .app-body   { display:flex; flex:1; overflow:hidden; }
 
 .sidebar    { width:var(--sidebar-w); background:#ffffff;
               border-right:1px solid var(--border); display:flex;
               flex-direction:column; padding:8px 6px; gap:4px; flex-shrink:0; }
-.nav-item   { display:flex; flex-direction:column; align-items:center;
-              padding:10px 2px 8px; border-radius:8px; cursor:pointer;
-              color:var(--text3); text-decoration:none; transition:all .15s;
-              font-size:9px; font-weight:600; letter-spacing:.3px; gap:5px;
+.nav-item   { display:flex; align-items:center; justify-content:center;
+              padding:8px 4px; cursor:pointer;
+              color:var(--text3); text-decoration:none;
+              font-size:10px; font-weight:600; letter-spacing:.3px;
               user-select:none; }
 .nav-item:hover { background:#e0eaff; color:var(--accent); }
-.nav-item.active { background:var(--accent); color:#fff; box-shadow:0 2px 8px rgba(59,130,246,.25); }
-.nav-icon   { font-size:18px; line-height:1; }
+.nav-item.active { background:var(--accent); color:#fff; }
 
 .content    { flex:1; overflow-y:auto; padding:16px 20px; background:var(--bg); }
 .panel      { display:none; }
@@ -108,36 +107,34 @@ body {
 
 /* COMPONENTS */
 .btn { display:inline-flex; align-items:center; justify-content:center; gap:4px;
-       padding:6px 14px; border-radius:6px; font-size:12px; font-weight:500;
+       padding:6px 14px; font-size:12px; font-weight:500;
        font-family:inherit; border:1px solid var(--border); cursor:pointer;
-       background:var(--card); color:var(--text); transition:all .15s ease; }
-.btn:hover   { background:var(--card-hover); border-color:#94a3b8;
-               transform:translateY(-1px); box-shadow:0 2px 8px rgba(0,0,0,.06); }
-.btn:active  { transform:translateY(0); }
-.btn:disabled{ opacity:.35; cursor:not-allowed; transform:none; }
+       background:var(--card); color:var(--text); }
+.btn:hover   { background:var(--card-hover); border-color:#94a3b8; }
+.btn:active  { opacity:.85; }
+.btn:disabled{ opacity:.35; cursor:not-allowed; }
 .btn.accent  { background:var(--accent); border-color:var(--accent); color:#fff; }
-.btn.accent:hover { box-shadow:0 4px 16px var(--accent-glow); }
+.btn.accent:hover { opacity:.9; }
 .btn.green   { background:var(--green); border-color:var(--green); color:#fff; font-weight:600; }
-.btn.green:hover  { box-shadow:0 4px 16px var(--green-glow); }
+.btn.green:hover  { opacity:.9; }
 .btn.red     { background:var(--red); border-color:var(--red); color:#fff; font-weight:600; }
-.btn.red:hover    { box-shadow:0 4px 16px var(--red-glow); }
+.btn.red:hover    { opacity:.9; }
 .btn.blue    { background:var(--blue); border-color:var(--blue); color:#fff; font-weight:600; }
-.btn.blue:hover   { box-shadow:0 4px 16px var(--blue-glow); }
+.btn.blue:hover   { opacity:.9; }
 .btn-sm { padding:4px 10px; font-size:11px; }
 .btn-row { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
 
 input,select { font-family:inherit; font-size:12px; color:var(--text);
                background:var(--input-bg); border:1px solid var(--input-border);
-               padding:5px 8px; border-radius:6px; outline:none;
+               padding:5px 8px; outline:none;
                transition:border-color .15s; }
-input:focus,select:focus { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-glow); }
+input:focus,select:focus { border-color:var(--accent); }
 input[type=number] { width:64px; }
 select { min-width:74px; cursor:pointer; }
 option { background:#fff; }
 
 .card { background:var(--surface); border:1px solid var(--border);
-        border-radius:var(--radius); overflow:hidden; transition:border-color .2s;
-        box-shadow:0 1px 3px rgba(0,0,0,.04); }
+        overflow:hidden; }
 .card:hover { border-color:#94a3b8; }
 .card.connected { border-color:rgba(16,185,129,.4); }
 .card-head { padding:10px 14px; display:flex; align-items:center;
@@ -145,7 +142,7 @@ option { background:#fff; }
              background:var(--card); }
 .card-head .title { font-size:13px; font-weight:700; }
 .badge { font-size:10px; font-weight:600; text-transform:uppercase;
-         letter-spacing:.5px; padding:3px 8px; border-radius:20px;
+         letter-spacing:.5px; padding:3px 8px;
          background:#e2e8f0; color:var(--text2); }
 .badge.on { background:var(--green-glow); color:var(--green); }
 
@@ -173,7 +170,7 @@ option { background:#fff; }
 .proto-table tbody tr:hover { background:#f1f5f9; }
 .proto-table tbody tr.selected { background:rgba(239,68,68,.08); }
 .proto-table tbody tr.active   { background:rgba(59,130,246,.08); }
-.tag { display:inline-block; padding:1px 6px; border-radius:4px;
+.tag { display:inline-block; padding:1px 6px;
        font-size:10px; font-weight:600; }
 .tag-run  { background:rgba(16,185,129,.1);  color:#059669; }
 .tag-stop { background:rgba(239,68,68,.1); color:var(--red); }
@@ -190,9 +187,9 @@ option { background:#fff; }
 /* PRESET CARDS */
 .preset-list { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
 .preset-chip { display:inline-flex; align-items:center; gap:6px; padding:5px 12px;
-               border-radius:20px; background:var(--card); border:1px solid var(--border);
-               font-size:11px; cursor:pointer; transition:all .15s; }
-.preset-chip:hover { border-color:var(--accent); background:var(--accent-glow); }
+               background:var(--card); border:1px solid var(--border);
+               font-size:11px; cursor:pointer; }
+.preset-chip:hover { border-color:var(--accent); }
 .preset-chip.active { border-color:var(--accent); background:var(--accent-glow); color:var(--accent); }
 .preset-chip .del { color:var(--red); font-weight:700; cursor:pointer; margin-left:2px; }
 .preset-chip .del:hover { text-decoration:underline; }
@@ -206,14 +203,14 @@ option { background:#fff; }
 .live-placeholder { color:var(--text3); font-size:14px; text-align:center; padding:32px; }
 .live-overlay { position:absolute; bottom:12px; left:50%; transform:translateX(-50%);
                 display:flex; gap:6px; background:rgba(0,0,0,.65); padding:6px 12px;
-                border-radius:8px; backdrop-filter:blur(8px); }
+                backdrop-filter:blur(8px); }
 .live-fps { position:absolute; top:10px; right:10px; font-size:12px; font-weight:600;
             color:var(--green); background:rgba(0,0,0,.6); padding:3px 10px;
-            border-radius:4px; display:none; }
+            display:none; }
 .live-quick { display:flex; gap:8px; align-items:center; padding:8px 0; flex-wrap:wrap; }
 .filmstrip { display:flex; gap:6px; padding:8px 0; overflow-x:auto; min-height:40px; }
 .filmstrip-item { flex-shrink:0; font-size:10px; color:var(--text2); padding:4px 10px;
-                  background:var(--card); border:1px solid var(--border); border-radius:6px; }
+                  background:var(--card); border:1px solid var(--border); }
 
 /* TIMELINE */
 .tl-layout { display:flex; flex-direction:column; gap:10px; height:calc(100vh - 100px); }
@@ -222,8 +219,8 @@ option { background:#fff; }
 .tl-progress { font-size:12px; color:var(--text2); margin-left:auto; }
 
 .tl-ruler-wrap { flex:1; min-height:0; display:flex; flex-direction:column;
-                 border:1px solid var(--border); border-radius:var(--radius);
-                 background:var(--surface); overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+                 border:1px solid var(--border);
+                 background:var(--surface); overflow:hidden; }
 .tl-ruler-scroll { flex:1; overflow-x:auto; overflow-y:auto; position:relative; }
 .tl-ruler { position:relative; min-height:100%; }
 .tl-ruler-axis { position:sticky; top:0; z-index:5; height:28px;
@@ -236,29 +233,29 @@ option { background:#fff; }
                  letter-spacing:.4px; color:var(--text3); text-align:right;
                  padding-right:8px; pointer-events:none; }
 .tl-lane { position:relative; height:40px; margin-bottom:4px; margin-left:56px; }
-.tl-lane-bg { position:absolute; inset:0; border-radius:4px;
+.tl-lane-bg { position:absolute; inset:0;
               background:repeating-linear-gradient(90deg,transparent,transparent 49.5%,
               var(--border) 49.5%,var(--border) 50.5%,transparent 50.5%); opacity:.3; }
 
-.tl-event { position:absolute; top:2px; height:36px; border-radius:5px; cursor:pointer;
+.tl-event { position:absolute; top:2px; height:36px; cursor:pointer;
             display:flex; align-items:center; padding:0 8px; font-size:10px; font-weight:600;
             color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-            transition:box-shadow .15s; user-select:none; min-width:20px; }
-.tl-event:hover { box-shadow:0 2px 10px rgba(0,0,0,.15); }
-.tl-event.selected { box-shadow:0 0 0 2px var(--accent), 0 2px 10px rgba(0,0,0,.15); }
-.tl-event.running { box-shadow:0 0 0 2px var(--green), 0 0 12px var(--green-glow); }
+            user-select:none; min-width:20px; }
+.tl-event:hover { opacity:.9; }
+.tl-event.selected { box-shadow:0 0 0 2px var(--accent); }
+.tl-event.running { box-shadow:0 0 0 2px var(--green); }
 .tl-event .ev-label { overflow:hidden; text-overflow:ellipsis; flex:1; }
 .tl-event .ev-handle { position:absolute; top:0; width:6px; height:100%; cursor:ew-resize; }
-.tl-event .ev-handle.left { left:0; border-radius:5px 0 0 5px; }
-.tl-event .ev-handle.right { right:0; border-radius:0 5px 5px 0; }
+.tl-event .ev-handle.left { left:0; }
+.tl-event .ev-handle.right { right:0; }
 .tl-event .ev-handle:hover { background:rgba(255,255,255,.25); }
 .tl-snap-line { position:absolute; top:0; bottom:0; width:1px; background:var(--accent);
                 opacity:.6; pointer-events:none; z-index:50; }
-.tl-ev-video { background:linear-gradient(135deg,#3b82f6,#2563eb); }
-.tl-ev-stack { background:linear-gradient(135deg,#8b5cf6,#7c3aed); }
-.tl-ev-timelapse { background:linear-gradient(135deg,#10b981,#059669); }
-.tl-ev-pump { background:linear-gradient(135deg,#f59e0b,#d97706); }
-.tl-ev-cavro { background:linear-gradient(135deg,#06b6d4,#0891b2); }
+.tl-ev-video { background:#2563eb; }
+.tl-ev-stack { background:#7c3aed; }
+.tl-ev-timelapse { background:#059669; }
+.tl-ev-pump { background:#d97706; }
+.tl-ev-cavro { background:#0891b2; }
 
 .tl-lane-row { position:relative; display:flex; align-items:center; }
 .tl-lane-actions { position:absolute; right:4px; top:50%; transform:translateY(-50%);
@@ -272,9 +269,9 @@ option { background:#fff; }
 .tl-playhead::before { content:''; position:absolute; top:-2px; left:-4px;
                        border:5px solid transparent; border-top-color:var(--red); }
 
-.tl-editor { border:1px solid var(--border); border-radius:var(--radius);
+.tl-editor { border:1px solid var(--border);
              background:var(--surface); padding:14px; flex-shrink:0;
-             box-shadow:0 1px 3px rgba(0,0,0,.04); display:none; }
+             display:none; }
 .tl-editor.open { display:block; }
 .tl-editor .ed-title { font-size:13px; font-weight:700; margin-bottom:10px;
                        display:flex; align-items:center; justify-content:space-between; }
@@ -282,30 +279,33 @@ option { background:#fff; }
 .tl-editor .ed-col { display:flex; flex-direction:column; gap:6px; min-width:140px; }
 
 /* VIEWER */
-.npy-sidebar { width:220px; min-width:180px; max-height:100%; overflow-y:auto;
-               border-right:1px solid var(--border); padding:4px 0; }
+.npy-sidebar { width:240px; min-width:200px; max-height:100%; overflow-y:auto;
+               border-right:1px solid var(--border); }
+.npy-exp-name { background:var(--card); }
+.npy-exp-name:hover { background:var(--card-hover); }
+.npy-type-name:hover { background:var(--card-hover); }
 .npy-file { padding:6px 12px; cursor:pointer; border-bottom:1px solid var(--border); }
-.npy-file:hover { background:var(--surface-hover); }
+.npy-file:hover { background:var(--card-hover); }
 .npy-file.active { background:var(--blue); color:#fff; }
-.npy-file .fname { font-weight:500; }
+.npy-file .fname { font-weight:500; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .npy-file .fmeta { font-size:9px; opacity:.7; }
 .npy-preview { flex:1; display:flex; flex-direction:column; align-items:center;
                justify-content:center; padding:16px; gap:10px; min-width:0; }
 .npy-preview img { max-width:100%; max-height:calc(100vh - 220px); object-fit:contain;
-                   border-radius:4px; background:#000; }
+                   background:#000; }
 .npy-controls { display:flex; align-items:center; gap:8px; width:100%; max-width:600px; }
 .npy-controls input[type=range] { flex:1; }
 
 /* LOG */
 .log-container { background:var(--surface); border:1px solid var(--border);
-                 border-radius:var(--radius); padding:4px 0;
+                 padding:4px 0;
                  max-height:calc(100vh - 180px); overflow-y:auto;
                  font-family:'Cascadia Code','Fira Code',monospace; font-size:12px; }
 .log-entry { padding:4px 14px; display:flex; gap:10px; align-items:baseline;
              border-bottom:1px solid #e2e8f0; }
 .log-entry:last-child { border-bottom:none; }
 .log-time  { color:var(--text3); font-size:11px; flex-shrink:0; min-width:60px; }
-.log-badge { font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px;
+.log-badge { font-size:10px; font-weight:600; padding:1px 6px;
              flex-shrink:0; min-width:56px; text-align:center; }
 .log-badge.pump   { background:rgba(59,130,246,.1); color:var(--accent); }
 .log-badge.camera { background:rgba(59,130,246,.08);  color:var(--blue); }
@@ -318,9 +318,9 @@ option { background:#fff; }
 /* TOASTS */
 #toasts { position:fixed; bottom:20px; right:20px; z-index:999;
           display:flex; flex-direction:column-reverse; gap:8px; }
-.toast { padding:10px 16px; border-radius:8px; font-size:12px; font-weight:500;
+.toast { padding:10px 16px; font-size:12px; font-weight:500;
          background:#ffffff; border:1px solid var(--border); color:var(--text);
-         box-shadow:0 8px 32px rgba(0,0,0,.1); animation:slideIn .25s ease;
+         box-shadow:0 2px 8px rgba(0,0,0,.08); animation:slideIn .25s ease;
          max-width:380px; }
 .toast.error   { border-color:rgba(239,68,68,.3); color:var(--red); }
 .toast.success { border-color:rgba(16,185,129,.3);  color:var(--green); }
@@ -353,34 +353,26 @@ option { background:#fff; }
   <div class="app-body">
 
     <nav class="sidebar">
-      <a class="nav-item active" data-panel="pumps" onclick="switchPanel('pumps')">
-        <span class="nav-icon">&#9879;</span>Pumps</a>
-      <a class="nav-item" data-panel="cavro" onclick="switchPanel('cavro')">
-        <span class="nav-icon">&#9881;</span>Cavro</a>
-      <a class="nav-item" data-panel="scope-setup" onclick="switchPanel('scope-setup')">
-        <span class="nav-icon">&#128300;</span>Setup</a>
-      <a class="nav-item" data-panel="cam-setup" onclick="switchPanel('cam-setup')">
-        <span class="nav-icon">&#128247;</span>Camera</a>
-      <a class="nav-item" data-panel="live" onclick="switchPanel('live')">
-        <span class="nav-icon">&#128065;</span>Live</a>
-      <a class="nav-item" data-panel="timeline" onclick="switchPanel('timeline')">
-        <span class="nav-icon">&#9202;</span>Timeline</a>
-      <a class="nav-item" data-panel="viewer" onclick="switchPanel('viewer')">
-        <span class="nav-icon">&#128444;</span>Viewer</a>
-      <a class="nav-item" data-panel="log" onclick="switchPanel('log')">
-        <span class="nav-icon">&#9776;</span>Log</a>
+      <!-- <a class="nav-item" data-panel="pumps" onclick="switchPanel('pumps')">Pumps</a> -->
+      <a class="nav-item active" data-panel="cavro" onclick="switchPanel('cavro')">Cavro</a>
+      <a class="nav-item" data-panel="scope-setup" onclick="switchPanel('scope-setup')">Setup</a>
+      <a class="nav-item" data-panel="cam-setup" onclick="switchPanel('cam-setup')">Camera</a>
+      <a class="nav-item" data-panel="live" onclick="switchPanel('live')">Live</a>
+      <a class="nav-item" data-panel="timeline" onclick="switchPanel('timeline')">Timeline</a>
+      <a class="nav-item" data-panel="viewer" onclick="switchPanel('viewer')">Viewer</a>
+      <a class="nav-item" data-panel="log" onclick="switchPanel('log')">Log</a>
     </nav>
 
     <div class="content">
 
       <!-- ════════ PUMPS ════════ -->
-      <section id="panel-pumps" class="panel active">
+      <section id="panel-pumps" class="panel">
         <div class="panel-title">Syringe Pumps</div>
         <div class="pump-grid" id="pumpGrid"></div>
       </section>
 
       <!-- ════════ CAVRO PUMPS ════════ -->
-      <section id="panel-cavro" class="panel">
+      <section id="panel-cavro" class="panel active">
         <div class="panel-title">Tecan Cavro Pumps</div>
         <div class="card" style="max-width:420px">
           <div class="card-head"><span class="title">RS-485 Bus</span>
@@ -542,65 +534,6 @@ option { background:#fff; }
             </div>
           </div>
 
-          <!-- Focus Z -->
-          <div class="card">
-            <div class="card-head"><span class="title">Focus (Z)</span></div>
-            <div class="section">
-              <div class="field">
-                <span id="scopeZPos" style="font-size:12px;color:var(--text2);min-width:90px">-</span>
-                <button class="btn btn-sm" onclick="scopeZRefresh()">&#8635;</button>
-              </div>
-              <div class="field">
-                <label>Step</label>
-                <select id="scopeZStep">
-                  <option value="100">100 nm</option>
-                  <option value="500">500 nm</option>
-                  <option value="1000" selected>1 &micro;m</option>
-                  <option value="5000">5 &micro;m</option>
-                  <option value="10000">10 &micro;m</option>
-                  <option value="50000">50 &micro;m</option>
-                </select>
-              </div>
-              <div class="btn-row">
-                <button class="btn btn-sm" onclick="scopeZMove(-1)" style="font-size:16px;padding:2px 12px">&#9660;</button>
-                <button class="btn btn-sm" onclick="scopeZMove(1)" style="font-size:16px;padding:2px 12px">&#9650;</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- XY Stage -->
-          <div class="card">
-            <div class="card-head"><span class="title">XY Stage</span></div>
-            <div class="section">
-              <div class="field">
-                <span id="scopeXYPos" style="font-size:11px;color:var(--text2)">X: - &nbsp; Y: -</span>
-                <button class="btn btn-sm" onclick="scopeXYRefresh()">&#8635;</button>
-              </div>
-              <div class="field">
-                <label>Step</label>
-                <select id="scopeXYStep">
-                  <option value="1000">1 &micro;m</option>
-                  <option value="5000">5 &micro;m</option>
-                  <option value="10000" selected>10 &micro;m</option>
-                  <option value="50000">50 &micro;m</option>
-                  <option value="100000">100 &micro;m</option>
-                  <option value="1000000">1 mm</option>
-                </select>
-              </div>
-              <div style="display:grid;grid-template-columns:repeat(3,36px);gap:3px;justify-content:center;margin-top:4px">
-                <div></div>
-                <button class="btn btn-sm" onclick="scopeXYMove(0,-1)" style="font-size:14px;padding:2px">&#9650;</button>
-                <div></div>
-                <button class="btn btn-sm" onclick="scopeXYMove(-1,0)" style="font-size:14px;padding:2px">&#9664;</button>
-                <div></div>
-                <button class="btn btn-sm" onclick="scopeXYMove(1,0)" style="font-size:14px;padding:2px">&#9654;</button>
-                <div></div>
-                <button class="btn btn-sm" onclick="scopeXYMove(0,1)" style="font-size:14px;padding:2px">&#9660;</button>
-                <div></div>
-              </div>
-            </div>
-          </div>
-
           <!-- Microscope Presets -->
           <div class="card" style="grid-column:1/-1">
             <div class="card-head"><span class="title">Microscope Presets</span></div>
@@ -692,6 +625,7 @@ option { background:#fff; }
                   <option value="8">8×</option>
                 </select>
                 <label style="font-size:10px">Color</label>
+                <span id="acqColorSwatch" style="display:inline-block;width:14px;height:14px;border:1px solid var(--border);vertical-align:middle;background:#888"></span>
                 <select id="acqColor" style="min-width:70px;font-size:11px" onchange="acqColorChanged()">
                   <option value="auto">Auto</option>
                   <option value="none">None</option>
@@ -769,7 +703,11 @@ option { background:#fff; }
 
       <!-- ════════ TIMELINE ════════ -->
       <section id="panel-timeline" class="panel">
-        <div class="panel-title">Acquisition Timeline</div>
+        <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:12px">
+          <div class="panel-title" style="margin-bottom:0">Experiment:</div>
+          <input type="text" id="tlExpName" placeholder="enter experiment name"
+                 style="flex:1;max-width:400px;font-size:16px;font-weight:600;padding:6px 10px">
+        </div>
         <div class="tl-layout">
 
           <!-- Toolbar -->
@@ -777,10 +715,10 @@ option { background:#fff; }
             <button class="btn accent btn-sm" onclick="tlAddEvent('video')">+ Video</button>
             <button class="btn btn-sm" style="background:#8b5cf6;border-color:#8b5cf6;color:#fff" onclick="tlAddEvent('stack')">+ Stack</button>
             <button class="btn green btn-sm" onclick="tlAddEvent('timelapse')">+ Timelapse</button>
-            <button class="btn btn-sm" style="background:#f59e0b;border-color:#f59e0b;color:#fff" onclick="tlAddPumpEvent()">+ Pump</button>
+            <!-- <button class="btn btn-sm" style="background:#f59e0b;border-color:#f59e0b;color:#fff" onclick="tlAddPumpEvent()">+ Pump</button> -->
             <button class="btn btn-sm" style="background:#06b6d4;border-color:#06b6d4;color:#fff" onclick="tlAddCavroEvent()">+ Cavro</button>
             <div class="sep"></div>
-            <button class="btn btn-sm" onclick="tlAddPumpLane()">+ Pump Lane</button>
+            <!-- <button class="btn btn-sm" onclick="tlAddPumpLane()">+ Pump Lane</button> -->
             <select id="tlCavroLanePick" style="min-width:70px;font-size:11px">
               <option value="0">Cavro 1</option><option value="1">Cavro 2</option>
               <option value="2">Cavro 3</option><option value="3">Cavro 4</option>
@@ -1280,7 +1218,7 @@ async function cavroDisconnectBus() {
 /* ── Homing ───────────────────────────────────────────────────────────────── */
 async function cavroHome(i) {
   if(!cavroBusConnected){ toast("Connect bus first","error"); return; }
-  toast("Homing Cavro "+(i+1)+"…");
+  toast("Homing Cavro "+(i+1)+"...");
   const r = await api('cavro_home', i);
   if(r.error) toast("C"+(i+1)+": "+r.error,"error");
   else { toast("C"+(i+1)+" homed","success"); cavroRefreshAllStatus(); }
@@ -1288,7 +1226,7 @@ async function cavroHome(i) {
 
 async function cavroHomeAll() {
   if(!cavroBusConnected){ toast("Connect bus first","error"); return; }
-  toast("Homing all Cavro pumps…");
+  toast("Homing all Cavro pumps...");
   const r = await api('cavro_home_all');
   if(r.error) toast("Cavro: "+r.error,"error");
   else { toast("All Cavro pumps homed","success"); cavroRefreshAllStatus(); }
@@ -1832,19 +1770,27 @@ function acqEditPreset(name) {
   document.getElementById("acqExposure").value = p.exposure_ms || 50;
   document.getElementById("acqBinning").value = p.binning || 1;
   document.getElementById("acqColor").value = p.color || 'auto';
+  acqColorChanged();
 }
+const _ACQ_COLOR_HEX = {
+  none:'#888888', blue:'#3b82f6', green:'#22c55e', red:'#ef4444',
+  cyan:'#06b6d4', magenta:'#d946ef', yellow:'#eab308', auto:'#888888'
+};
 function acqColorChanged() {
   const sel = document.getElementById("acqColor");
+  const swatch = document.getElementById("acqColorSwatch");
+  let displayColor = sel.value;
   if(sel.value === 'auto') {
     const msName = document.getElementById("acqMsPreset").value;
     const msObj = _loadStore("mos11_ms_presets");
     const m = msObj[msName];
     const filterColors = {1:'none',2:'blue',3:'green',4:'red'};
-    const autoColor = m ? (filterColors[m.filter] || 'none') : 'none';
-    sel.title = 'Auto → ' + autoColor;
+    displayColor = m ? (filterColors[m.filter] || 'none') : 'none';
+    sel.title = 'Auto: ' + displayColor;
   } else {
     sel.title = '';
   }
+  if(swatch) swatch.style.background = _ACQ_COLOR_HEX[displayColor] || '#888';
 }
 async function acqLoadPreset(name) {
   const obj = _loadStore("mos11_acq_presets");
@@ -1853,6 +1799,7 @@ async function acqLoadPreset(name) {
   document.getElementById("acqExposure").value = p.exposure_ms || 50;
   document.getElementById("acqBinning").value = p.binning || 1;
   document.getElementById("acqColor").value = p.color || 'auto';
+  acqColorChanged();
   const tasks = [];
   if(p.microscopePreset) tasks.push(msLoadPreset(p.microscopePreset));
   if(scopeCamConnected) {
@@ -1867,10 +1814,18 @@ function renderAcqPresets() {
   const el = document.getElementById("acqPresetList");
   el.innerHTML = Object.keys(obj).map(n => {
     const p = obj[n];
-    const colorLabel = (p.color && p.color !== 'auto') ? p.color : 'auto';
+    const colorVal = p.color || 'auto';
+    let swatchHex = _ACQ_COLOR_HEX[colorVal] || '#888';
+    if(colorVal === 'auto') {
+      const msObj2 = _loadStore("mos11_ms_presets");
+      const m2 = msObj2[p.microscopePreset];
+      const fc = {1:'none',2:'blue',3:'green',4:'red'};
+      swatchHex = _ACQ_COLOR_HEX[m2 ? (fc[m2.filter]||'none') : 'none'] || '#888';
+    }
     return `<div class="preset-chip" onclick="acqLoadPreset('${n}')">
       <span>${n}</span>
-      <span style="font-size:10px;color:var(--text3)">${p.microscopePreset} — ${p.exposure_ms}ms ${p.binning}x [${colorLabel}]</span>
+      <span style="display:inline-block;width:10px;height:10px;background:${swatchHex};vertical-align:middle;margin:0 2px"></span>
+      <span style="font-size:10px;color:var(--text3)">${p.microscopePreset} — ${p.exposure_ms}ms ${p.binning}x</span>
       <span class="edit" onclick="event.stopPropagation();acqEditPreset('${n}')">&#9998;</span>
       <span class="del" onclick="event.stopPropagation();acqDeletePreset('${n}')">&times;</span>
     </div>`;
@@ -2006,6 +1961,7 @@ function tlAddEvent(type) {
   tlSelectedId = ev.id; tlRender(); tlOpenEditor(ev);
 }
 
+/* -- Pump lane feature (commented out) --
 function tlAddPumpEvent() {
   const pps = tlPxPerSec();
   const scroll = document.getElementById("tlScroll");
@@ -2031,6 +1987,7 @@ function tlAddPumpLane() {
   const lane = { id: 'pump'+nextIdx, label:'Pump '+(nextIdx+1), type:'pump', pumpIdx: nextIdx };
   tlLanes.push(lane); tlSaveLanes(); tlRender();
 }
+-- end pump lane feature */
 
 function tlAddCavroLane() {
   const pick = parseInt(document.getElementById("tlCavroLanePick").value);
@@ -2184,7 +2141,7 @@ function tlRender() {
         if(ev.cavroAction === 'coordinated') {
           const partnerLane = tlLanes.find(l => l.type==='cavro' && l.cavroIdx === ev.partnerIdx);
           const partnerName = partnerLane ? partnerLane.label : ('Cavro '+(ev.partnerIdx+1));
-          blockLabel = isMirror ? `Output (← ${pumpName})` : `Input (→ ${partnerName})`;
+          blockLabel = isMirror ? `Output [${pumpName}]` : `Input [${partnerName}]`;
         } else if(ev.cavroAction === 'continuous') {
           blockLabel = `Cont: ${pumpName}`;
         } else if(ev.cavroAction === 'dispense') {
@@ -2360,6 +2317,7 @@ function tlOpenEditor(ev) {
   const presetCol = document.getElementById("tlEdPresetCol");
   const ts = document.getElementById("tlEdTypeSettings");
 
+  /* -- pump editor (commented out) --
   if(ev.type === 'pump') {
     presetCol.style.display = 'none';
     const pumpLanes = tlLanes.filter(l => l.type === 'pump');
@@ -2394,7 +2352,8 @@ function tlOpenEditor(ev) {
         <option value="WDR" ${ev.direction==='WDR'?'selected':''}>Withdraw</option>
       </select>
     </div>`;
-  } else if(ev.type === 'cavro') {
+  } else -- end pump editor */
+  if(ev.type === 'cavro') {
     presetCol.style.display = 'none';
     const cavroLanes = tlLanes.filter(l => l.type === 'cavro');
     const act = ev.cavroAction || 'valve';
@@ -2636,7 +2595,7 @@ function tlEditorChanged() {
   }
   const prevLaneId = ev.laneId;
   let newLaneId = ev.laneId;
-  if(ev.type === 'pump') newLaneId = document.getElementById("tlEdPumpLane")?.value || ev.laneId;
+  /* if(ev.type === 'pump') newLaneId = document.getElementById("tlEdPumpLane")?.value || ev.laneId; */
   if(ev.type === 'cavro') newLaneId = document.getElementById("tlEdCavroLane")?.value || ev.laneId;
 
   if(!tlOverlaps(newLaneId, wantStart, wantDur, ev.id)) {
@@ -2648,6 +2607,7 @@ function tlEditorChanged() {
     document.getElementById("tlEdDur").value = ev.duration;
   }
 
+  /* -- pump editor save (commented out) --
   if(ev.type === 'pump') {
     const act = document.getElementById("tlEdPumpAction");
     if(act) ev.action = act.value;
@@ -2659,7 +2619,8 @@ function tlEditorChanged() {
     if(dir) ev.direction = dir.value;
     const lane = tlLanes.find(l => l.id === ev.laneId);
     if(lane) ev.pumpIdx = lane.pumpIdx;
-  } else if(ev.type === 'cavro') {
+  } else -- end pump editor save */
+  if(ev.type === 'cavro') {
     const prevAction = ev.cavroAction;
     const actEl = document.getElementById("tlEdCavroAction");
     if(actEl) ev.cavroAction = actEl.value;
@@ -2709,9 +2670,9 @@ function tlEditorChanged() {
       const minDisp = ev.velUnit==='ulmin' ? (minMlS*60000).toFixed(1)+' µL/min' : minMlS.toFixed(4)+' mL/s';
       const maxDisp = ev.velUnit==='ulmin' ? (maxMlS*60000).toFixed(0)+' µL/min' : maxMlS.toFixed(3)+' mL/s';
       if(velMlS < minMlS) {
-        if(estEl) { estEl.textContent = `⚠ Too slow! Min: ${minDisp}`; estEl.style.color = 'var(--red, #e53e3e)'; }
+        if(estEl) { estEl.textContent = `Too slow — Min: ${minDisp}`; estEl.style.color = 'var(--red, #e53e3e)'; }
       } else if(velMlS > maxMlS) {
-        if(estEl) { estEl.textContent = `⚠ Too fast! Max: ${maxDisp}`; estEl.style.color = 'var(--red, #e53e3e)'; }
+        if(estEl) { estEl.textContent = `Too fast — Max: ${maxDisp}`; estEl.style.color = 'var(--red, #e53e3e)'; }
       } else if(estEl) {
         const mlsDisp = velMlS.toFixed(4);
         const ulminDisp = (velMlS * 60000).toFixed(1);
@@ -2736,7 +2697,7 @@ function tlEditorChanged() {
       ev.duration = Math.max(estSec, 1);
       if(estEl && !(velMlS && (velMlS < minMlS || velMlS > maxMlS))) {
         const pushOnly = Math.ceil(pushTime);
-        estEl.textContent = `≈ ${estSec}s total (pull ~${Math.ceil(pullTime)}s + push ~${pushOnly}s, ${strokes} stroke${strokes>1?'s':''})`;
+        estEl.textContent = `~${estSec}s total (pull ~${Math.ceil(pullTime)}s + push ~${pushOnly}s, ${strokes} stroke${strokes>1?'s':''})`;
       }
       const durEl = document.getElementById("tlEdDuration");
       if(durEl) durEl.value = ev.duration;
@@ -2852,6 +2813,7 @@ async function tlRunCycle(sorted, progress, running) {
     if(el) el.classList.add("running");
     logMsg(`Timeline: starting ${ev.type} "${ev.name}"`, "exp");
 
+    /* -- pump execution (commented out) --
     if(ev.type === 'pump') {
       const pi = ev.pumpIdx || 0;
       if(ev.action === 'stop') {
@@ -2863,7 +2825,8 @@ async function tlRunCycle(sorted, progress, running) {
         await tlSleep(ev.duration * 1000);
         if(!tlAbort) await api('pump_stop', pi);
       }
-    } else if(ev.type === 'cavro') {
+    } else -- end pump execution */
+    if(ev.type === 'cavro') {
       const ci = parseInt(ev.cavroIdx) || 0;
       const act = ev.cavroAction || 'valve';
       console.log('Cavro event:', {act, ci, velocity: ev.velocity, velUnit: ev.velUnit, duration: ev.duration});
@@ -2901,6 +2864,7 @@ async function tlRunCycle(sorted, progress, running) {
 
       try {
         if(ev.type === 'video') {
+          await api('cam_experiment_set_subdir', 'video');
           const fps = ev.fps || 30;
           const recDur = ev._recordDur || ev.duration;
           progress.textContent = `${ev.name}: recording ${recDur}s @ ${fps}fps...`;
@@ -2909,6 +2873,7 @@ async function tlRunCycle(sorted, progress, running) {
           if(r.error) logMsg(`Video error: ${r.error}`, "error");
           else await done;
         } else if(ev.type === 'stack') {
+          await api('cam_experiment_set_subdir', 'stack');
           const presetNames = ev.stackPresets && ev.stackPresets.length ? ev.stackPresets : [];
           if(!presetNames.length) {
             progress.textContent = `${ev.name}: no presets selected`;
@@ -2939,6 +2904,7 @@ async function tlRunCycle(sorted, progress, running) {
             else await done;
           }
         } else if(ev.type === 'timelapse') {
+          await api('cam_experiment_set_subdir', 'timelapse');
           const frames = ev.frames || 10;
           const intervalMs = ev.interval || 1000;
           const intervalSec = intervalMs / 1000;
@@ -2986,7 +2952,23 @@ async function tlRunCycle(sorted, progress, running) {
 }
 
 async function tlPlay() {
+  console.log("tlPlay called, events:", tlEvents.length);
   if(!tlEvents.length){ toast("Add events to timeline first","error"); return; }
+  let expName = document.getElementById("tlExpName").value.trim();
+  console.log("expName:", JSON.stringify(expName));
+  if(!expName){
+    const d = new Date();
+    expName = `exp_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`;
+    document.getElementById("tlExpName").value = expName;
+  }
+  let expRes;
+  try {
+    expRes = await api('cam_experiment_start', expName);
+  } catch(e) {
+    toast("Server error: " + e.message, "error"); return;
+  }
+  if(expRes.error){ toast("Experiment folder: "+expRes.error,"error"); return; }
+  logMsg("Experiment folder: "+expRes.path, "exp");
   tlRunning = true; tlAbort = false;
   document.getElementById("tlPlayBtn").disabled = true;
   document.getElementById("tlStopBtn").disabled = false;
@@ -3032,6 +3014,7 @@ async function tlPlay() {
   progress.textContent = tlAbort
     ? `Stopped after ${cycle} cycles (${tlFormatDuration(Math.round(totalElapsed))})`
     : `Complete: ${cycle} cycles (${tlFormatDuration(Math.round(totalElapsed))})`;
+  await api('cam_experiment_end');
   if(!tlAbort) toast("Timeline complete","success");
   logMsg("Timeline " + (tlAbort ? "stopped" : "complete") + ` after ${cycle} cycles`, "exp");
   tlRender();
@@ -3064,38 +3047,111 @@ function npyOpen(filename) {
   npyRefreshList(filename);
 }
 
+let _npySubdir = null;
+
 async function npyRefreshList(autoSelect) {
-  const r = await api('cam_list_captures');
   const sidebar = document.getElementById("npySidebar");
-  if(!r.files || !r.files.length) {
+  const r = await api('cam_list_experiments');
+  const experiments = (r && r.experiments) || [];
+
+  const loose = await api('cam_list_captures');
+  const looseFiles = (loose && loose.files) || [];
+
+  if(!experiments.length && !looseFiles.length) {
     sidebar.innerHTML = '<div style="padding:8px 12px;font-size:11px;color:var(--text3)">No captures found</div>';
     return;
   }
-  sidebar.innerHTML = r.files.map(f => {
+
+  let html = '';
+
+  for(const exp of experiments) {
+    html += `<div class="npy-exp" style="border-bottom:1px solid var(--border)">
+      <div class="npy-exp-name" onclick="npyToggleExp(this)" style="padding:8px 12px;cursor:pointer;font-weight:600;font-size:12px;display:flex;justify-content:space-between;align-items:center">
+        <span>${exp.name}</span>
+        <span style="font-size:9px;color:var(--text3)">${Object.values(exp.counts).reduce((a,b)=>a+b,0)} files</span>
+      </div>
+      <div class="npy-exp-body" style="display:none">`;
+    for(const t of exp.types) {
+      const count = exp.counts[t] || 0;
+      if(count === 0) continue;
+      const sub = exp.name + '/' + t;
+      html += `<div class="npy-type" style="border-top:1px solid var(--border)">
+        <div class="npy-type-name" onclick="npyToggleType(this, '${sub}')" style="padding:5px 12px 5px 20px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text2);display:flex;justify-content:space-between;align-items:center">
+          <span>${t}</span>
+          <span style="font-size:9px;color:var(--text3)">${count}</span>
+        </div>
+        <div class="npy-type-files" style="display:none"></div>
+      </div>`;
+    }
+    html += `</div></div>`;
+  }
+
+  if(looseFiles.length) {
+    html += '<div style="border-bottom:1px solid var(--border)">';
+    for(const f of looseFiles) {
+      const dims = f.shape.length === 3
+        ? `${f.shape[0]} frames, ${f.shape[2]}×${f.shape[1]}`
+        : f.shape.length === 2 ? `${f.shape[1]}×${f.shape[0]}` : '?';
+      html += `<div class="npy-file" data-name="${f.name}" onclick="npySelectFile('${f.name}', null)">
+        <span class="fname">${f.name}</span>
+        <span class="fmeta">${dims}</span>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  sidebar.innerHTML = html;
+
+  if(autoSelect && _npySubdir) {
+    npySelectFile(autoSelect, _npySubdir);
+  }
+}
+
+function npyToggleExp(el) {
+  const body = el.nextElementSibling;
+  body.style.display = body.style.display === 'none' ? 'block' : 'none';
+}
+
+async function npyToggleType(el, subdir) {
+  const filesDiv = el.nextElementSibling;
+  if(filesDiv.style.display !== 'none') {
+    filesDiv.style.display = 'none';
+    return;
+  }
+  filesDiv.innerHTML = '<div style="padding:4px 20px;font-size:10px;color:var(--text3)">Loading...</div>';
+  filesDiv.style.display = 'block';
+  const r = await api('cam_list_captures', subdir);
+  const files = (r && r.files) || [];
+  if(!files.length) {
+    filesDiv.innerHTML = '<div style="padding:4px 28px;font-size:10px;color:var(--text3)">Empty</div>';
+    return;
+  }
+  filesDiv.innerHTML = files.map(f => {
     const dims = f.shape.length === 3
-      ? `${f.shape[0]} frames, ${f.shape[2]}×${f.shape[1]}`
+      ? `${f.shape[0]}f, ${f.shape[2]}×${f.shape[1]}`
       : f.shape.length === 2 ? `${f.shape[1]}×${f.shape[0]}` : '?';
-    return `<div class="npy-file" data-name="${f.name}" onclick="npySelect('${f.name}')">
-      <span class="fname">${f.name}</span>
+    return `<div class="npy-file" data-name="${f.name}" data-subdir="${subdir}" onclick="npySelectFile('${f.name}','${subdir}')" style="padding-left:28px">
+      <span class="fname" style="font-size:11px">${f.name}</span>
       <span class="fmeta">${dims}</span>
     </div>`;
   }).join("");
-
-  if(autoSelect) npySelect(autoSelect);
 }
 
-async function npySelect(filename) {
+function npySelectFile(filename, subdir) {
   _npyCurrentFile = filename;
+  _npySubdir = subdir;
   _npyShowingStack = false;
   const sb = document.getElementById("npyStackBtn");
   if(sb) { sb.textContent = "Stack All"; sb.style.background = "#8b5cf6"; }
   document.querySelectorAll(".npy-file").forEach(el => {
-    el.classList.toggle("active", el.dataset.name === filename);
+    const match = el.dataset.name === filename && (el.dataset.subdir || null) === subdir;
+    el.classList.toggle("active", match);
   });
   npyBcgReset(true);
   document.getElementById("npyBcgControls").style.display = "block";
-  await npyLoadFrame(filename, 0);
+  npyLoadFrame(filename, 0);
 }
+function npySelect(filename) { npySelectFile(filename, null); }
 
 function _npyBcgValues() {
   return {
@@ -3108,7 +3164,7 @@ function _npyBcgValues() {
 async function npyLoadFrame(filename, frameIdx) {
   const bcg = _npyBcgValues();
   const r = await api('cam_npy_preview', filename, frameIdx,
-                       bcg.brightness, bcg.contrast, bcg.gamma);
+                       bcg.brightness, bcg.contrast, bcg.gamma, _npySubdir);
   if(r.error) { document.getElementById("npyFileInfo").textContent = r.error; return; }
 
   const img = document.getElementById("npyImage");
@@ -3168,7 +3224,7 @@ function npyBcgChanged() {
 async function npyAutoAdjust() {
   if(!_npyCurrentFile) return;
   const idx = parseInt(document.getElementById("npyFrameSlider").value) || 0;
-  const r = await api('cam_npy_auto_adjust', _npyCurrentFile, idx);
+  const r = await api('cam_npy_auto_adjust', _npyCurrentFile, idx, _npySubdir);
   if(r.error) { toast(r.error, "error"); return; }
   document.getElementById("npyBrightness").value = r.brightness;
   document.getElementById("npyContrast").value = r.contrast;
@@ -3205,7 +3261,7 @@ async function npyStackFrames() {
   }
   const bcg = _npyBcgValues();
   const r = await api('cam_npy_stack', _npyCurrentFile, 'max',
-                       bcg.brightness, bcg.contrast, bcg.gamma);
+                       bcg.brightness, bcg.contrast, bcg.gamma, _npySubdir);
   if(r.error) { toast(r.error, "error"); return; }
   _npyShowingStack = true;
   document.getElementById("npyStackBtn").textContent = "Single Frame";

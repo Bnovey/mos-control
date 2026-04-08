@@ -53,11 +53,13 @@ _binning = (1, 1)
 _live_thread = None
 _live_stop = threading.Event()
 _live_fps = 0.0
+_live_exposure_changed = threading.Event()
 
 _capture_thread = None
 _capture_stop = threading.Event()
 
 _save_dir = os.path.join(os.path.dirname(__file__), "..", "captures")
+_base_save_dir = _save_dir
 
 _frame_lock = threading.Lock()
 _latest_jpeg = None          # raw JPEG bytes for WebSocket stream
@@ -297,6 +299,7 @@ def get_camera_info():
 def set_exposure(ms):
     global _exposure_ms
     _exposure_ms = max(1, int(ms))
+    _live_exposure_changed.set()
 
 
 def get_exposure():
@@ -396,6 +399,22 @@ def _live_loop():
         frames_count = 0
 
         while not _live_stop.is_set():
+            if _live_exposure_changed.is_set():
+                _live_exposure_changed.clear()
+                try:
+                    with _lock:
+                        pvc.abort(_hcam)
+                        frame_bytes = pvc.setup_cont(_hcam, _exposure_ms, _binning[0])
+                        n_circ = 2
+                        _circ_buf_size = frame_bytes * n_circ
+                        _circ_buf = (pvc.uns16 * (_circ_buf_size // 2))()
+                        pvc.start_cont(_hcam, _circ_buf, _circ_buf_size)
+                except Exception:
+                    if _live_stop.is_set():
+                        break
+                    time.sleep(0.01)
+                    continue
+
             try:
                 status, _, _ = pvc.check_cont_status(_hcam)
                 if status >= pvc.FRAME_AVAILABLE:
@@ -926,8 +945,9 @@ def cam_capture_stop():
 
 @expose
 def cam_set_save_dir(path):
-    global _save_dir
+    global _save_dir, _base_save_dir
     _save_dir = path
+    _base_save_dir = path
     os.makedirs(_save_dir, exist_ok=True)
     return {"ok": True, "path": _save_dir}
 
@@ -938,16 +958,53 @@ def cam_get_save_dir():
 
 
 @expose
-def cam_list_captures():
-    """List .npy files in the save directory, newest first."""
-    save = os.path.normpath(_save_dir)
-    if not os.path.isdir(save):
+def cam_experiment_start(name):
+    """Create an experiment folder with timelapse/video/stack subfolders."""
+    global _save_dir
+    exp_dir = os.path.join(_base_save_dir, name)
+    for sub in ("timelapse", "video", "stack"):
+        os.makedirs(os.path.join(exp_dir, sub), exist_ok=True)
+    _save_dir = exp_dir
+    return {"ok": True, "path": exp_dir}
+
+
+@expose
+def cam_experiment_set_subdir(subdir):
+    """Switch save target to a subfolder within the current experiment."""
+    global _save_dir
+    exp_dir = os.path.dirname(_save_dir) if os.path.basename(_save_dir) in ("timelapse", "video", "stack") else _save_dir
+    _save_dir = os.path.join(exp_dir, subdir)
+    os.makedirs(_save_dir, exist_ok=True)
+    return {"ok": True, "path": _save_dir}
+
+
+@expose
+def cam_experiment_end():
+    """Reset save directory back to the base captures folder."""
+    global _save_dir
+    _save_dir = _base_save_dir
+    return {"ok": True, "path": _save_dir}
+
+
+@expose
+def cam_list_captures(subdir=None):
+    """List .npy files in a directory, newest first.
+
+    subdir: optional relative path under _base_save_dir (e.g. "exp1/stack").
+    If None, lists files in _base_save_dir itself.
+    """
+    base = os.path.normpath(_base_save_dir)
+    if subdir:
+        target = os.path.normpath(os.path.join(base, subdir))
+    else:
+        target = base
+    if not os.path.isdir(target):
         return {"files": []}
-    files = [f for f in os.listdir(save) if f.endswith(".npy")]
-    files.sort(key=lambda f: os.path.getmtime(os.path.join(save, f)), reverse=True)
+    files = [f for f in os.listdir(target) if f.endswith(".npy")]
+    files.sort(key=lambda f: os.path.getmtime(os.path.join(target, f)), reverse=True)
     result = []
     for f in files:
-        path = os.path.join(save, f)
+        path = os.path.join(target, f)
         try:
             arr = np.load(path, mmap_mode='r')
             shape = [int(d) for d in arr.shape]
@@ -955,6 +1012,27 @@ def cam_list_captures():
             shape = []
         result.append({"name": f, "shape": shape})
     return {"files": result}
+
+
+@expose
+def cam_list_experiments():
+    """List experiment folders in _base_save_dir (those containing subfolders)."""
+    base = os.path.normpath(_base_save_dir)
+    if not os.path.isdir(base):
+        return {"experiments": []}
+    experiments = []
+    for name in sorted(os.listdir(base)):
+        d = os.path.join(base, name)
+        if os.path.isdir(d):
+            subs = [s for s in ("video", "stack", "timelapse")
+                    if os.path.isdir(os.path.join(d, s))]
+            if subs:
+                counts = {}
+                for s in subs:
+                    sd = os.path.join(d, s)
+                    counts[s] = len([f for f in os.listdir(sd) if f.endswith(".npy")])
+                experiments.append({"name": name, "types": subs, "counts": counts})
+    return {"experiments": experiments}
 
 
 def _apply_bcg(frame, brightness=0, contrast=100, gamma=1.0, max_dim=1200):
@@ -1004,9 +1082,12 @@ def _apply_bcg(frame, brightness=0, contrast=100, gamma=1.0, max_dim=1200):
 
 
 @expose
-def cam_npy_auto_adjust(filename, frame_idx=0):
+def cam_npy_auto_adjust(filename, frame_idx=0, subdir=None):
     """Analyze a frame and return suggested brightness/contrast/gamma values."""
-    path = os.path.join(os.path.normpath(_save_dir), filename)
+    base = os.path.normpath(_base_save_dir) if subdir else os.path.normpath(_save_dir)
+    if subdir:
+        base = os.path.join(base, subdir)
+    path = os.path.join(base, filename)
     if not os.path.isfile(path):
         return {"error": f"File not found: {filename}"}
     try:
@@ -1106,12 +1187,16 @@ def cam_npy_histogram(filename, frame_idx=0, bins=256):
 
 
 @expose
-def cam_npy_stack(filename, mode="max", brightness=0, contrast=100, gamma=1.0):
+def cam_npy_stack(filename, mode="max", brightness=0, contrast=100, gamma=1.0, subdir=None):
     """Return a composite of all frames in an .npy file as a base64 JPEG.
 
     mode: 'max' (max-intensity projection), 'mean' (average), 'sum' (sum clipped).
+    subdir: optional relative path under _base_save_dir.
     """
-    path = os.path.join(os.path.normpath(_save_dir), filename)
+    base = os.path.normpath(_base_save_dir) if subdir else os.path.normpath(_save_dir)
+    if subdir:
+        base = os.path.join(base, subdir)
+    path = os.path.join(base, filename)
     if not os.path.isfile(path):
         return {"error": f"File not found: {filename}"}
     try:
@@ -1174,15 +1259,19 @@ def cam_npy_stack(filename, mode="max", brightness=0, contrast=100, gamma=1.0):
 
 
 @expose
-def cam_npy_preview(filename, frame_idx=0, brightness=0, contrast=100, gamma=1.0):
+def cam_npy_preview(filename, frame_idx=0, brightness=0, contrast=100, gamma=1.0, subdir=None):
     """Return a base64 JPEG preview of an .npy file.
 
     For 3D arrays (video/timelapse), frame_idx selects which frame.
     Reads the .meta.json sidecar to apply the saved pseudo-color.
     brightness/contrast/gamma allow viewer-side image adjustments.
+    subdir: optional relative path under _base_save_dir.
     """
     global _pseudo_color, _pseudo_color_name
-    path = os.path.join(os.path.normpath(_save_dir), filename)
+    base = os.path.normpath(_base_save_dir) if subdir else os.path.normpath(_save_dir)
+    if subdir:
+        base = os.path.join(base, subdir)
+    path = os.path.join(base, filename)
     if not os.path.isfile(path):
         return {"error": f"File not found: {filename}"}
     try:
