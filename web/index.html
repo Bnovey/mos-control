@@ -252,10 +252,13 @@ option { background:#fff; }
 .tl-event .ev-handle.left { left:0; border-radius:5px 0 0 5px; }
 .tl-event .ev-handle.right { right:0; border-radius:0 5px 5px 0; }
 .tl-event .ev-handle:hover { background:rgba(255,255,255,.25); }
+.tl-snap-line { position:absolute; top:0; bottom:0; width:1px; background:var(--accent);
+                opacity:.6; pointer-events:none; z-index:50; }
 .tl-ev-video { background:linear-gradient(135deg,#3b82f6,#2563eb); }
 .tl-ev-stack { background:linear-gradient(135deg,#8b5cf6,#7c3aed); }
 .tl-ev-timelapse { background:linear-gradient(135deg,#10b981,#059669); }
 .tl-ev-pump { background:linear-gradient(135deg,#f59e0b,#d97706); }
+.tl-ev-cavro { background:linear-gradient(135deg,#06b6d4,#0891b2); }
 
 .tl-lane-row { position:relative; display:flex; align-items:center; }
 .tl-lane-actions { position:absolute; right:4px; top:50%; transform:translateY(-50%);
@@ -335,6 +338,10 @@ option { background:#fff; }
         <span class="indicator" id="indP1"><span class="dot"></span>P2</span>
         <span class="indicator" id="indP2"><span class="dot"></span>P3</span>
         <span class="indicator" id="indP3"><span class="dot"></span>P4</span>
+        <span class="indicator" id="indC0"><span class="dot"></span>C1</span>
+        <span class="indicator" id="indC1"><span class="dot"></span>C2</span>
+        <span class="indicator" id="indC2"><span class="dot"></span>C3</span>
+        <span class="indicator" id="indC3"><span class="dot"></span>C4</span>
         <span class="indicator" id="indScope"><span class="dot"></span>SCOPE</span>
         <span class="indicator" id="indIL"><span class="dot"></span>IL</span>
         <span class="indicator" id="indCam"><span class="dot"></span>CAM</span>
@@ -348,6 +355,8 @@ option { background:#fff; }
     <nav class="sidebar">
       <a class="nav-item active" data-panel="pumps" onclick="switchPanel('pumps')">
         <span class="nav-icon">&#9879;</span>Pumps</a>
+      <a class="nav-item" data-panel="cavro" onclick="switchPanel('cavro')">
+        <span class="nav-icon">&#9881;</span>Cavro</a>
       <a class="nav-item" data-panel="scope-setup" onclick="switchPanel('scope-setup')">
         <span class="nav-icon">&#128300;</span>Setup</a>
       <a class="nav-item" data-panel="cam-setup" onclick="switchPanel('cam-setup')">
@@ -368,6 +377,51 @@ option { background:#fff; }
       <section id="panel-pumps" class="panel active">
         <div class="panel-title">Syringe Pumps</div>
         <div class="pump-grid" id="pumpGrid"></div>
+      </section>
+
+      <!-- ════════ CAVRO PUMPS ════════ -->
+      <section id="panel-cavro" class="panel">
+        <div class="panel-title">Tecan Cavro Pumps</div>
+        <div class="card" style="max-width:420px">
+          <div class="card-head"><span class="title">RS-485 Bus</span>
+            <span class="badge" id="cavroBusBadge">Offline</span></div>
+          <div class="section">
+            <div class="field"><label>Port</label><select id="cavroPort" style="flex:1"></select></div>
+            <div class="field"><label>Syringe</label>
+              <input type="number" id="cavroSyringe" value="0.5" step="0.1" style="width:64px"> mL</div>
+            <div class="field"><label>Valves</label>
+              <input type="number" id="cavroValves" value="6" min="2" max="9" style="width:50px"></div>
+            <div class="field"><label>Addresses</label>
+              <input type="text" id="cavroAddresses" value="0,1,2,3" style="width:100px"
+                     title="Comma-separated RS-485 addresses for C1–C4"></div>
+            <div class="btn-row">
+              <button class="btn green btn-sm" id="cavroBusConn" onclick="cavroConnectBus()">Connect Bus</button>
+              <button class="btn red btn-sm" id="cavroBusDisc" onclick="cavroDisconnectBus()" disabled>Disconnect</button>
+              <button class="btn accent btn-sm" onclick="cavroHomeAll()">Home All</button>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-label">Individual Home</div>
+            <div class="btn-row">
+              <button class="btn blue btn-sm" onclick="cavroHome(0)">Home C1</button>
+              <button class="btn blue btn-sm" onclick="cavroHome(1)">Home C2</button>
+              <button class="btn blue btn-sm" onclick="cavroHome(2)">Home C3</button>
+              <button class="btn blue btn-sm" onclick="cavroHome(3)">Home C4</button>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-label">Status</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px">
+              <div>C1: <span id="cStatus0">—</span></div>
+              <div>C2: <span id="cStatus1">—</span></div>
+              <div>C3: <span id="cStatus2">—</span></div>
+              <div>C4: <span id="cStatus3">—</span></div>
+            </div>
+            <div class="btn-row" style="margin-top:6px">
+              <button class="btn btn-sm" onclick="cavroRefreshAllStatus()">Refresh All</button>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- ════════ MICROSCOPE SETUP ════════ -->
@@ -637,6 +691,17 @@ option { background:#fff; }
                   <option value="4">4×</option>
                   <option value="8">8×</option>
                 </select>
+                <label style="font-size:10px">Color</label>
+                <select id="acqColor" style="min-width:70px;font-size:11px" onchange="acqColorChanged()">
+                  <option value="auto">Auto</option>
+                  <option value="none">None</option>
+                  <option value="blue">Blue</option>
+                  <option value="green">Green</option>
+                  <option value="red">Red</option>
+                  <option value="cyan">Cyan</option>
+                  <option value="magenta">Magenta</option>
+                  <option value="yellow">Yellow</option>
+                </select>
                 <button class="btn btn-sm accent" onclick="acqSavePreset()">Save</button>
               </div>
               <div class="preset-list" id="acqPresetList"></div>
@@ -713,11 +778,16 @@ option { background:#fff; }
             <button class="btn btn-sm" style="background:#8b5cf6;border-color:#8b5cf6;color:#fff" onclick="tlAddEvent('stack')">+ Stack</button>
             <button class="btn green btn-sm" onclick="tlAddEvent('timelapse')">+ Timelapse</button>
             <button class="btn btn-sm" style="background:#f59e0b;border-color:#f59e0b;color:#fff" onclick="tlAddPumpEvent()">+ Pump</button>
+            <button class="btn btn-sm" style="background:#06b6d4;border-color:#06b6d4;color:#fff" onclick="tlAddCavroEvent()">+ Cavro</button>
             <div class="sep"></div>
             <button class="btn btn-sm" onclick="tlAddPumpLane()">+ Pump Lane</button>
+            <select id="tlCavroLanePick" style="min-width:70px;font-size:11px">
+              <option value="0">Cavro 1</option><option value="1">Cavro 2</option>
+              <option value="2">Cavro 3</option><option value="3">Cavro 4</option>
+            </select>
+            <button class="btn btn-sm" onclick="tlAddCavroLane()">+ Cavro Lane</button>
             <div class="sep"></div>
             <button class="btn green btn-sm" id="tlPlayBtn" onclick="tlPlay()">&#9654; Play</button>
-            <button class="btn btn-sm" id="tlPauseBtn" onclick="tlPause()" disabled>&#10074;&#10074; Pause</button>
             <button class="btn red btn-sm" id="tlStopBtn" onclick="tlStop()" disabled>&#9632; Stop</button>
             <div class="sep"></div>
             <label style="font-size:11px;font-weight:600;color:var(--text2)">Zoom</label>
@@ -909,6 +979,9 @@ function updateIndicators() {
   for(let i=0;i<NUM_PUMPS;i++){
     document.getElementById("indP"+i).classList.toggle("on", pumpState[i].connected);
   }
+  for(let i=0;i<NUM_CAVRO;i++){
+    document.getElementById("indC"+i).classList.toggle("on", cavroBusConnected);
+  }
   document.getElementById("indCam").classList.toggle("on", scopeCamConnected);
   document.getElementById("indScope").classList.toggle("on", scopeTiConnected);
   document.getElementById("indIL").classList.toggle("on", _ilConnected);
@@ -946,6 +1019,12 @@ async function refreshPorts() {
     let cur = sel.value;
     sel.innerHTML = names.map(n=>`<option>${n}</option>`).join("");
     if(cur && names.includes(cur)) sel.value = cur;
+  }
+  let cSel = document.getElementById("cavroPort");
+  if(cSel){
+    let cur = cSel.value;
+    cSel.innerHTML = names.map(n=>`<option>${n}</option>`).join("");
+    if(cur && names.includes(cur)) cSel.value = cur;
   }
   toast("Ports refreshed ("+names.length+")","success");
 }
@@ -1157,6 +1236,81 @@ onEvent("onPumpProtocolUpdate", function(idx, step, status, msg) {
 });
 onEvent("onPumpProtocolCountdown", function(idx, step, remaining) {
   document.getElementById("protoStat"+idx).textContent="Step "+(step+1)+" \u2014 "+remaining;
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CAVRO PUMPS  (setup-only tab; operations happen via Timeline)
+   ═══════════════════════════════════════════════════════════════════════════ */
+const NUM_CAVRO = 4;
+let cavroBusConnected = false;
+
+/* ── Bus connection ───────────────────────────────────────────────────────── */
+async function cavroConnectBus() {
+  const port = document.getElementById("cavroPort").value;
+  const syr  = parseFloat(document.getElementById("cavroSyringe").value);
+  const vlv  = parseInt(document.getElementById("cavroValves").value);
+  const addrStr = document.getElementById("cavroAddresses").value.trim();
+  const addrs = addrStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+  if(!port){ toast("Select a port","error"); return; }
+  if(addrs.length !== 4){ toast("Enter exactly 4 comma-separated addresses","error"); return; }
+  const r = await api('cavro_connect_bus', port, syr, vlv, addrs);
+  if(r.error){ toast("Cavro: "+r.error,"error"); return; }
+  cavroBusConnected = true;
+  document.getElementById("cavroBusBadge").className="badge on";
+  document.getElementById("cavroBusBadge").textContent="Online";
+  document.getElementById("cavroBusConn").disabled=true;
+  document.getElementById("cavroBusDisc").disabled=false;
+  updateIndicators();
+  toast("Cavro bus connected on "+port,"success");
+  logMsg("Cavro bus connected on "+port,"sys");
+  cavroRefreshAllStatus();
+}
+
+async function cavroDisconnectBus() {
+  await api('cavro_disconnect_bus');
+  cavroBusConnected = false;
+  document.getElementById("cavroBusBadge").className="badge";
+  document.getElementById("cavroBusBadge").textContent="Offline";
+  document.getElementById("cavroBusConn").disabled=false;
+  document.getElementById("cavroBusDisc").disabled=true;
+  for(let i=0;i<NUM_CAVRO;i++) document.getElementById("cStatus"+i).textContent="—";
+  updateIndicators();
+}
+
+/* ── Homing ───────────────────────────────────────────────────────────────── */
+async function cavroHome(i) {
+  if(!cavroBusConnected){ toast("Connect bus first","error"); return; }
+  toast("Homing Cavro "+(i+1)+"…");
+  const r = await api('cavro_home', i);
+  if(r.error) toast("C"+(i+1)+": "+r.error,"error");
+  else { toast("C"+(i+1)+" homed","success"); cavroRefreshAllStatus(); }
+}
+
+async function cavroHomeAll() {
+  if(!cavroBusConnected){ toast("Connect bus first","error"); return; }
+  toast("Homing all Cavro pumps…");
+  const r = await api('cavro_home_all');
+  if(r.error) toast("Cavro: "+r.error,"error");
+  else { toast("All Cavro pumps homed","success"); cavroRefreshAllStatus(); }
+}
+
+/* ── Status ───────────────────────────────────────────────────────────────── */
+async function cavroRefreshStatus(i) {
+  if(!cavroBusConnected) return;
+  const r = await api('cavro_get_status', i);
+  const el = document.getElementById("cStatus"+i);
+  if(!el) return;
+  if(r.error){ el.textContent="Error"; return; }
+  el.textContent = (r.ready?"Ready":"Busy") + " | Port "+r.valve_position+" | "+r.position_ml+" mL";
+}
+
+async function cavroRefreshAllStatus() {
+  for(let i=0;i<NUM_CAVRO;i++) cavroRefreshStatus(i);
+}
+
+/* ── Cavro event handlers (for timeline-triggered operations) ─────────────── */
+onEvent("onCavroContinuousUpdate", function(idx, status, msg) {
+  logMsg("C"+(idx+1)+": "+msg, "sys");
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1656,8 +1810,9 @@ function acqSavePreset() {
   const binning = parseInt(document.getElementById("acqBinning").value) || 1;
   if(!name){ toast("Enter a name","error"); return; }
   if(!ms){ toast("Select a scope preset","error"); return; }
+  const color = document.getElementById("acqColor").value || 'auto';
   const obj = _loadStore("mos11_acq_presets");
-  obj[name] = { microscopePreset: ms, exposure_ms: exposure, binning: binning };
+  obj[name] = { microscopePreset: ms, exposure_ms: exposure, binning: binning, color: color };
   _saveStore("mos11_acq_presets", obj);
   document.getElementById("acqPresetName").value = "";
   renderAcqPresets();
@@ -1676,6 +1831,20 @@ function acqEditPreset(name) {
   document.getElementById("acqMsPreset").value = p.microscopePreset || '';
   document.getElementById("acqExposure").value = p.exposure_ms || 50;
   document.getElementById("acqBinning").value = p.binning || 1;
+  document.getElementById("acqColor").value = p.color || 'auto';
+}
+function acqColorChanged() {
+  const sel = document.getElementById("acqColor");
+  if(sel.value === 'auto') {
+    const msName = document.getElementById("acqMsPreset").value;
+    const msObj = _loadStore("mos11_ms_presets");
+    const m = msObj[msName];
+    const filterColors = {1:'none',2:'blue',3:'green',4:'red'};
+    const autoColor = m ? (filterColors[m.filter] || 'none') : 'none';
+    sel.title = 'Auto → ' + autoColor;
+  } else {
+    sel.title = '';
+  }
 }
 async function acqLoadPreset(name) {
   const obj = _loadStore("mos11_acq_presets");
@@ -1683,6 +1852,7 @@ async function acqLoadPreset(name) {
   document.getElementById("acqPresetName").value = name;
   document.getElementById("acqExposure").value = p.exposure_ms || 50;
   document.getElementById("acqBinning").value = p.binning || 1;
+  document.getElementById("acqColor").value = p.color || 'auto';
   const tasks = [];
   if(p.microscopePreset) tasks.push(msLoadPreset(p.microscopePreset));
   if(scopeCamConnected) {
@@ -1697,9 +1867,10 @@ function renderAcqPresets() {
   const el = document.getElementById("acqPresetList");
   el.innerHTML = Object.keys(obj).map(n => {
     const p = obj[n];
+    const colorLabel = (p.color && p.color !== 'auto') ? p.color : 'auto';
     return `<div class="preset-chip" onclick="acqLoadPreset('${n}')">
       <span>${n}</span>
-      <span style="font-size:10px;color:var(--text3)">${p.microscopePreset} — ${p.exposure_ms}ms ${p.binning}x</span>
+      <span style="font-size:10px;color:var(--text3)">${p.microscopePreset} — ${p.exposure_ms}ms ${p.binning}x [${colorLabel}]</span>
       <span class="edit" onclick="event.stopPropagation();acqEditPreset('${n}')">&#9998;</span>
       <span class="del" onclick="event.stopPropagation();acqDeletePreset('${n}')">&times;</span>
     </div>`;
@@ -1720,16 +1891,16 @@ let tlLanes  = JSON.parse(localStorage.getItem("mos11_tl_lanes")||'null')
                || [{id:"imaging", label:"Imaging", type:"imaging"}, {id:"pump0", label:"Pump 1", type:"pump", pumpIdx:0}];
 let tlSelectedId = null;
 let tlRunning = false;
-let tlPaused = false;
 let tlAbort = false;
 let _tlIdCounter = Date.now();
 function _tlId() { return 'ev' + (_tlIdCounter++); }
 
 const TL_COLORS = {
-  video:'tl-ev-video', stack:'tl-ev-stack', timelapse:'tl-ev-timelapse', pump:'tl-ev-pump'
+  video:'tl-ev-video', stack:'tl-ev-stack', timelapse:'tl-ev-timelapse',
+  pump:'tl-ev-pump', cavro:'tl-ev-cavro'
 };
 const TL_LABELS = {
-  video:'Video', stack:'Preset Stack', timelapse:'Timelapse', pump:'Pump'
+  video:'Video', stack:'Preset Stack', timelapse:'Timelapse', pump:'Pump', cavro:'Cavro'
 };
 
 function tlSaveEvents() {
@@ -1782,9 +1953,16 @@ function tlUpdateTotalTime() {
 
 function tlOverlaps(laneId, start, dur, excludeId) {
   const end = start + dur;
-  return tlEvents.some(e =>
-    e.laneId === laneId && e.id !== excludeId && e.start < end && (e.start + e.duration) > start
-  );
+  const lane = tlLanes.find(l => l.id === laneId);
+  return tlEvents.some(e => {
+    if(e.id === excludeId) return false;
+    if(!(e.start < end && (e.start + e.duration) > start)) return false;
+    if(e.laneId === laneId) return true;
+    if(lane && lane.type === 'cavro' && e.type === 'cavro' &&
+       e.cavroAction === 'coordinated' && e.partnerIdx === lane.cavroIdx)
+      return true;
+    return false;
+  });
 }
 
 function tlFindFreeStart(laneId, desiredStart, dur, excludeId) {
@@ -1852,6 +2030,34 @@ function tlAddPumpLane() {
   if(nextIdx >= 4){ toast("Max 4 pump lanes","error"); return; }
   const lane = { id: 'pump'+nextIdx, label:'Pump '+(nextIdx+1), type:'pump', pumpIdx: nextIdx };
   tlLanes.push(lane); tlSaveLanes(); tlRender();
+}
+
+function tlAddCavroLane() {
+  const pick = parseInt(document.getElementById("tlCavroLanePick").value);
+  const used = new Set(tlLanes.filter(l => l.type === 'cavro').map(l => l.cavroIdx));
+  if(used.has(pick)){ toast("Cavro "+(pick+1)+" already has a lane","error"); return; }
+  if(used.size >= 4){ toast("Max 4 Cavro lanes","error"); return; }
+  const lane = { id: 'cavro'+pick, label:'Cavro '+(pick+1), type:'cavro', cavroIdx: pick };
+  tlLanes.push(lane); tlSaveLanes(); tlRender();
+}
+
+function tlAddCavroEvent() {
+  const pps = tlPxPerSec();
+  const scroll = document.getElementById("tlScroll");
+  const startSec = Math.round((scroll.scrollLeft / pps) * 10) / 10;
+  const cavroLane = tlLanes.find(l => l.type === 'cavro');
+  if(!cavroLane){ toast("Add a Cavro lane first","error"); return; }
+  const safeStart = tlFindFreeStart(cavroLane.id, startSec, 5, null);
+  const ev = {
+    id: _tlId(), type:'cavro', laneId: cavroLane.id, name:'Cavro',
+    start: safeStart, duration: 5,
+    cavroIdx: cavroLane.cavroIdx || 0,
+    cavroAction: 'dispense',
+    fromPort: 1, toPort: 2,
+    volume: 0.5, velocity: ''
+  };
+  tlEvents.push(ev); tlSaveEvents();
+  tlSelectedId = ev.id; tlRender(); tlOpenEditor(ev);
 }
 
 function tlRemoveLane(laneId) {
@@ -1944,7 +2150,7 @@ function tlRender() {
     laneDiv.style.width = (rulerW - 56) + 'px';
     row.appendChild(laneDiv);
 
-    if(lane.type === 'pump') {
+    if(lane.type === 'pump' || lane.type === 'cavro') {
       const actions = document.createElement("div");
       actions.className = 'tl-lane-actions';
       actions.innerHTML = `<button title="Remove lane" onclick="tlRemoveLane('${lane.id}')">&times;</button>`;
@@ -1953,35 +2159,87 @@ function tlRender() {
 
     lanesEl.appendChild(row);
 
-    tlEvents.filter(e => e.laneId === lane.id).forEach(ev => {
+    const laneEvs = tlEvents.filter(e => e.laneId === lane.id);
+    const coordMirrors = tlEvents.filter(e =>
+      e.type === 'cavro' && e.cavroAction === 'coordinated' &&
+      e.laneId !== lane.id &&
+      tlLanes.some(l => l.id === lane.id && l.type === 'cavro' && l.cavroIdx === e.partnerIdx)
+    );
+
+    [...laneEvs, ...coordMirrors.map(e => ({...e, _mirror: true}))].forEach(ev => {
+      const isMirror = ev._mirror;
       const left = ev.start * pps;
       const width = Math.max(ev.duration * pps, 14);
       const colorClass = TL_COLORS[ev.type] || 'tl-ev-pump';
       const div = document.createElement("div");
-      div.className = 'tl-event ' + colorClass + (ev.id===tlSelectedId?' selected':'');
+      div.className = 'tl-event ' + colorClass + (ev.id===tlSelectedId?' selected':'') + (isMirror?' tl-mirror':'');
       div.style.left = left + 'px';
       div.style.width = width + 'px';
       div.dataset.id = ev.id;
-      div.innerHTML = `<span class="ev-label">${ev.name}</span>
-        <div class="ev-handle left"></div><div class="ev-handle right"></div>`;
+      if(isMirror) div.style.opacity = '0.6';
+      let blockLabel = ev.name;
+      if(ev.type === 'cavro') {
+        const evLane = tlLanes.find(l => l.id === ev.laneId);
+        const pumpName = evLane ? evLane.label : ('Cavro '+(ev.cavroIdx+1));
+        if(ev.cavroAction === 'coordinated') {
+          const partnerLane = tlLanes.find(l => l.type==='cavro' && l.cavroIdx === ev.partnerIdx);
+          const partnerName = partnerLane ? partnerLane.label : ('Cavro '+(ev.partnerIdx+1));
+          blockLabel = isMirror ? `Output (← ${pumpName})` : `Input (→ ${partnerName})`;
+        } else if(ev.cavroAction === 'continuous') {
+          blockLabel = `Cont: ${pumpName}`;
+        } else if(ev.cavroAction === 'dispense') {
+          blockLabel = `Disp: ${pumpName}`;
+        } else if(ev.cavroAction === 'valve') {
+          blockLabel = `Valve: ${pumpName}`;
+        }
+      }
+      div.innerHTML = `<span class="ev-label">${blockLabel}</span>` +
+        (isMirror ? '' : `<div class="ev-handle left"></div><div class="ev-handle right"></div>`);
 
-      div.addEventListener("mousedown", e => {
-        if(e.target.classList.contains("ev-handle")) return;
-        tlSelectedId = ev.id;
-        tlRender(); tlOpenEditor(ev);
-        _tlStartDrag(e, ev, 'move', laneDiv, pps);
-      });
-      div.querySelector(".ev-handle.left").addEventListener("mousedown", e => {
-        e.stopPropagation();
-        _tlStartDrag(e, ev, 'resize-left', laneDiv, pps);
-      });
-      div.querySelector(".ev-handle.right").addEventListener("mousedown", e => {
-        e.stopPropagation();
-        _tlStartDrag(e, ev, 'resize-right', laneDiv, pps);
-      });
+      if(!isMirror) {
+        div.addEventListener("mousedown", e => {
+          if(e.target.classList.contains("ev-handle")) return;
+          tlSelectedId = ev.id;
+          tlRender(); tlOpenEditor(ev);
+          _tlStartDrag(e, ev, 'move', laneDiv, pps);
+        });
+        div.querySelector(".ev-handle.left").addEventListener("mousedown", e => {
+          e.stopPropagation();
+          _tlStartDrag(e, ev, 'resize-left', laneDiv, pps);
+        });
+        div.querySelector(".ev-handle.right").addEventListener("mousedown", e => {
+          e.stopPropagation();
+          _tlStartDrag(e, ev, 'resize-right', laneDiv, pps);
+        });
+      } else {
+        div.addEventListener("mousedown", e => {
+          tlSelectedId = ev.id;
+          const real = tlEvents.find(x => x.id === ev.id);
+          if(real){ tlRender(); tlOpenEditor(real); }
+        });
+        div.style.cursor = 'pointer';
+      }
       laneDiv.appendChild(div);
     });
   });
+}
+
+/* ── Snap-to-edge helpers ── */
+function _tlSnapEdges(evId) {
+  const edges = [];
+  tlEvents.forEach(e => {
+    if(e.id === evId) return;
+    edges.push(e.start, e.start + e.duration);
+  });
+  return edges;
+}
+function _tlSnapVal(val, edges, thresh) {
+  let best = val, bestD = thresh + 1;
+  for(const edge of edges) {
+    const d = Math.abs(val - edge);
+    if(d < bestD) { bestD = d; best = edge; }
+  }
+  return bestD <= thresh ? best : val;
 }
 
 /* ── Drag / resize (with overlap prevention) ── */
@@ -1990,6 +2248,10 @@ function _tlStartDrag(e, ev, mode, lane, pps) {
   const startX = e.clientX;
   const origStart = ev.start;
   const origDur = ev.duration;
+  const edges = _tlSnapEdges(ev.id);
+  const snapThresh = 0.3;
+  const rulerWrap = document.getElementById("tlScroll");
+  let snapLines = [];
 
   function onMove(e2) {
     const dx = e2.clientX - startX;
@@ -1999,22 +2261,52 @@ function _tlStartDrag(e, ev, mode, lane, pps) {
     if(mode === 'move') {
       newStart = Math.max(0, Math.round((origStart + dt)*20)/20);
       newDur = origDur;
+      const snLeft = _tlSnapVal(newStart, edges, snapThresh);
+      const snRight = _tlSnapVal(newStart + newDur, edges, snapThresh);
+      const dL = Math.abs(snLeft - newStart);
+      const dR = Math.abs(snRight - (newStart + newDur));
+      if(dL <= snapThresh || dR <= snapThresh) {
+        newStart = dL <= dR ? snLeft : snRight - newDur;
+      }
+      newStart = Math.max(0, newStart);
     } else if(mode === 'resize-left') {
       newStart = Math.max(0, Math.round((origStart + dt)*20)/20);
+      newStart = _tlSnapVal(newStart, edges, snapThresh);
       newDur = origDur - (newStart - origStart);
       if(newDur < 0.1) return;
     } else {
       newStart = origStart;
       newDur = Math.max(0.1, Math.round((origDur + dt)*20)/20);
+      const snEnd = _tlSnapVal(newStart + newDur, edges, snapThresh);
+      if(Math.abs(snEnd - (newStart + newDur)) <= snapThresh) {
+        newDur = snEnd - newStart;
+      }
+      if(newDur < 0.1) return;
     }
 
     if(!tlOverlaps(ev.laneId, newStart, newDur, ev.id)) {
       ev.start = newStart;
       ev.duration = newDur;
       tlRender(); tlOpenEditor(ev);
+
+      snapLines.forEach(l => l.remove());
+      snapLines = [];
+      const snappedEdges = new Set();
+      [newStart, newStart + newDur].forEach(t => {
+        if(edges.some(ed => Math.abs(ed - t) < 0.01)) snappedEdges.add(t);
+      });
+      const lanesEl = document.getElementById("tlLanes");
+      snappedEdges.forEach(t => {
+        const line = document.createElement("div");
+        line.className = "tl-snap-line";
+        line.style.left = (t * pps + 56) + "px";
+        lanesEl.appendChild(line);
+        snapLines.push(line);
+      });
     }
   }
   function onUp() {
+    snapLines.forEach(l => l.remove());
     document.removeEventListener("mousemove", onMove);
     document.removeEventListener("mouseup", onUp);
     tlSaveEvents();
@@ -2102,6 +2394,115 @@ function tlOpenEditor(ev) {
         <option value="WDR" ${ev.direction==='WDR'?'selected':''}>Withdraw</option>
       </select>
     </div>`;
+  } else if(ev.type === 'cavro') {
+    presetCol.style.display = 'none';
+    const cavroLanes = tlLanes.filter(l => l.type === 'cavro');
+    const act = ev.cavroAction || 'valve';
+    const pumpLabel = act === 'coordinated' ? 'Input Pump' : 'Pump';
+    ts.innerHTML = `<div class="field" style="margin:0">
+      <label>${pumpLabel}</label>
+      <select id="tlEdCavroLane" onchange="tlEditorChanged()" style="min-width:80px">
+        ${cavroLanes.map(l => `<option value="${l.id}" ${ev.laneId===l.id?'selected':''}>${l.label}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field" style="margin:0">
+      <label>Action</label>
+      <select id="tlEdCavroAction" onchange="tlEditorChanged()" style="min-width:90px">
+        <option value="dispense" ${act==='dispense'?'selected':''}>Dispense</option>
+        <option value="continuous" ${act==='continuous'?'selected':''}>Continuous</option>
+        <option value="coordinated" ${act==='coordinated'?'selected':''}>Coordinated</option>
+        <option value="valve" ${act==='valve'?'selected':''}>Switch Valve</option>
+      </select>
+    </div>
+    <div id="tlEdCavroFields">
+    ${act==='dispense' ? `
+      <div class="field" style="margin:0">
+        <label>From</label>
+        <input type="number" id="tlEdCavroFrom" value="${ev.fromPort||1}" min="1" max="6"
+               style="width:44px" oninput="tlEditorChanged()">
+        <label style="min-width:auto">To</label>
+        <input type="number" id="tlEdCavroTo" value="${ev.toPort||2}" min="1" max="6"
+               style="width:44px" oninput="tlEditorChanged()">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Vol mL</label>
+        <input type="number" id="tlEdCavroVol" value="${ev.volume||0.5}" min="0" step="0.01"
+               style="width:60px" oninput="tlEditorChanged()">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Vel</label>
+        <input type="number" id="tlEdCavroVel" value="${ev.velocity||''}" step="0.01"
+               placeholder="auto" style="width:60px" oninput="tlEditorChanged()">
+        <select id="tlEdCavroVelUnit" onchange="tlEditorChanged()" style="min-width:60px;font-size:10px">
+          <option value="mls" ${(ev.velUnit||'mls')==='mls'?'selected':''}>mL/s</option>
+          <option value="ulmin" ${ev.velUnit==='ulmin'?'selected':''}>µL/min</option>
+        </select>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:2px" id="tlEdCavroEst"></div>` : ''}
+    ${act==='continuous' ? `
+      <div class="field" style="margin:0">
+        <label>From</label>
+        <input type="number" id="tlEdCavroFrom" value="${ev.fromPort||1}" min="1" max="6"
+               style="width:44px" oninput="tlEditorChanged()">
+        <label style="min-width:auto">To</label>
+        <input type="number" id="tlEdCavroTo" value="${ev.toPort||2}" min="1" max="6"
+               style="width:44px" oninput="tlEditorChanged()">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Vel</label>
+        <input type="number" id="tlEdCavroVel" value="${ev.velocity||''}" step="0.01"
+               placeholder="auto" style="width:60px" oninput="tlEditorChanged()">
+        <select id="tlEdCavroVelUnit" onchange="tlEditorChanged()" style="min-width:60px;font-size:10px">
+          <option value="mls" ${(ev.velUnit||'mls')==='mls'?'selected':''}>mL/s</option>
+          <option value="ulmin" ${ev.velUnit==='ulmin'?'selected':''}>µL/min</option>
+        </select>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:2px" id="tlEdCavroEst"></div>` : ''}
+    ${act==='coordinated' ? `
+      <div class="field" style="margin:0">
+        <label>Output Pump</label>
+        <select id="tlEdCavroPartner" onchange="tlEditorChanged()" style="min-width:80px">
+          ${cavroLanes.filter(l=>l.id!==ev.laneId).map(l => `<option value="${l.cavroIdx}" ${ev.partnerIdx===l.cavroIdx?'selected':''}>${l.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label>Input Pump</label>
+        <span style="font-size:10px;color:var(--text3)">from</span>
+        <input type="number" id="tlEdCavroFrom" value="${ev.fromPort||1}" min="1" max="6"
+               style="width:38px" oninput="tlEditorChanged()">
+        <span style="font-size:10px;color:var(--text3)">to</span>
+        <input type="number" id="tlEdCavroTo" value="${ev.toPort||2}" min="1" max="6"
+               style="width:38px" oninput="tlEditorChanged()">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Output Pump</label>
+        <span style="font-size:10px;color:var(--text3)">from</span>
+        <input type="number" id="tlEdCavroOutFrom" value="${ev.outFromPort||1}" min="1" max="6"
+               style="width:38px" oninput="tlEditorChanged()">
+        <span style="font-size:10px;color:var(--text3)">to</span>
+        <input type="number" id="tlEdCavroOutTo" value="${ev.outToPort||3}" min="1" max="6"
+               style="width:38px" oninput="tlEditorChanged()">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Vel</label>
+        <input type="number" id="tlEdCavroVel" value="${ev.velocity||''}" step="0.01"
+               placeholder="auto" style="width:60px" oninput="tlEditorChanged()">
+        <select id="tlEdCavroVelUnit" onchange="tlEditorChanged()" style="min-width:60px;font-size:10px">
+          <option value="mls" ${(ev.velUnit||'mls')==='mls'?'selected':''}>mL/s</option>
+          <option value="ulmin" ${ev.velUnit==='ulmin'?'selected':''}>µL/min</option>
+        </select>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:2px" id="tlEdCavroEst"></div>` : ''}
+    ${act==='valve' ? `
+      <div class="field" style="margin:0">
+        <label>Inlet</label>
+        <input type="number" id="tlEdCavroFrom" value="${ev.fromPort||1}" min="1" max="6"
+               style="width:44px" oninput="tlEditorChanged()">
+        <label style="min-width:auto">Outlet</label>
+        <input type="number" id="tlEdCavroTo" value="${ev.toPort||2}" min="1" max="6"
+               style="width:44px" oninput="tlEditorChanged()">
+      </div>` : ''}
+    </div>`;
   } else {
     if(ev.type === 'stack') {
       presetCol.style.display = 'none';
@@ -2176,6 +2577,7 @@ function tlStackCalcDuration(ev) {
     const a = acqObj[pn] || {};
     total += 1.5 + ((a.exposure_ms || 50) / 1000);
   }
+  total += 0.5;
   return Math.ceil(total);
 }
 
@@ -2232,9 +2634,10 @@ function tlEditorChanged() {
   } else {
     wantDur = edDur;
   }
-  const newLaneId = ev.type === 'pump'
-    ? (document.getElementById("tlEdPumpLane")?.value || ev.laneId)
-    : ev.laneId;
+  const prevLaneId = ev.laneId;
+  let newLaneId = ev.laneId;
+  if(ev.type === 'pump') newLaneId = document.getElementById("tlEdPumpLane")?.value || ev.laneId;
+  if(ev.type === 'cavro') newLaneId = document.getElementById("tlEdCavroLane")?.value || ev.laneId;
 
   if(!tlOverlaps(newLaneId, wantStart, wantDur, ev.id)) {
     ev.start = wantStart;
@@ -2256,6 +2659,88 @@ function tlEditorChanged() {
     if(dir) ev.direction = dir.value;
     const lane = tlLanes.find(l => l.id === ev.laneId);
     if(lane) ev.pumpIdx = lane.pumpIdx;
+  } else if(ev.type === 'cavro') {
+    const prevAction = ev.cavroAction;
+    const actEl = document.getElementById("tlEdCavroAction");
+    if(actEl) ev.cavroAction = actEl.value;
+    const lane = tlLanes.find(l => l.id === ev.laneId);
+    if(lane) ev.cavroIdx = lane.cavroIdx;
+    const fromEl = document.getElementById("tlEdCavroFrom");
+    if(fromEl) ev.fromPort = parseInt(fromEl.value) || 1;
+    const toEl = document.getElementById("tlEdCavroTo");
+    if(toEl) ev.toPort = parseInt(toEl.value) || 2;
+    const volEl = document.getElementById("tlEdCavroVol");
+    if(volEl) ev.volume = parseFloat(volEl.value) || 0;
+    const velEl = document.getElementById("tlEdCavroVel");
+    const velUnitEl = document.getElementById("tlEdCavroVelUnit");
+    if(velUnitEl) ev.velUnit = velUnitEl.value;
+    if(velEl) {
+      const rawVel = velEl.value ? parseFloat(velEl.value) : '';
+      ev.velocity = rawVel;
+    }
+    const partnerEl = document.getElementById("tlEdCavroPartner");
+    if(partnerEl) ev.partnerIdx = parseInt(partnerEl.value) || 0;
+    const outFromEl = document.getElementById("tlEdCavroOutFrom");
+    if(outFromEl) ev.outFromPort = parseInt(outFromEl.value) || 1;
+    const outToEl = document.getElementById("tlEdCavroOutTo");
+    if(outToEl) ev.outToPort = parseInt(outToEl.value) || 3;
+    const laneChanged = prevLaneId !== newLaneId;
+    if(ev.cavroAction !== prevAction || (laneChanged && ev.cavroAction === 'coordinated')) {
+      if(laneChanged) {
+        const newLane = tlLanes.find(l => l.id === newLaneId);
+        if(newLane) ev.cavroIdx = newLane.cavroIdx;
+        if(ev.partnerIdx === ev.cavroIdx) {
+          const other = tlLanes.find(l => l.type==='cavro' && l.cavroIdx !== ev.cavroIdx);
+          ev.partnerIdx = other ? other.cavroIdx : 0;
+        }
+      }
+      tlSaveEvents(); tlOpenEditor(ev); return;
+    }
+    // Speed limits
+    const syr = parseFloat(document.getElementById("cavroSyringe")?.value) || 0.5;
+    const countsPerMl = 3000 / syr;
+    const maxMlS = 2900 / countsPerMl;
+    const minMlS = 1 / countsPerMl;
+    const estEl = document.getElementById("tlEdCavroEst");
+    // Convert user velocity to mL/s for backend
+    let velMlS = null;
+    if(ev.velocity !== '' && ev.velocity > 0) {
+      velMlS = (ev.velUnit === 'ulmin') ? ev.velocity / 60000 : ev.velocity;
+      const minDisp = ev.velUnit==='ulmin' ? (minMlS*60000).toFixed(1)+' µL/min' : minMlS.toFixed(4)+' mL/s';
+      const maxDisp = ev.velUnit==='ulmin' ? (maxMlS*60000).toFixed(0)+' µL/min' : maxMlS.toFixed(3)+' mL/s';
+      if(velMlS < minMlS) {
+        if(estEl) { estEl.textContent = `⚠ Too slow! Min: ${minDisp}`; estEl.style.color = 'var(--red, #e53e3e)'; }
+      } else if(velMlS > maxMlS) {
+        if(estEl) { estEl.textContent = `⚠ Too fast! Max: ${maxDisp}`; estEl.style.color = 'var(--red, #e53e3e)'; }
+      } else if(estEl) {
+        const mlsDisp = velMlS.toFixed(4);
+        const ulminDisp = (velMlS * 60000).toFixed(1);
+        estEl.textContent = `= ${mlsDisp} mL/s = ${ulminDisp} µL/min (range: ${minDisp} – ${maxDisp})`;
+        estEl.style.color = '';
+      }
+    }
+    if(ev.cavroAction === 'valve') {
+      ev.duration = 1;
+      const durEl = document.getElementById("tlEdDuration");
+      if(durEl) durEl.value = ev.duration;
+    }
+    if(ev.cavroAction === 'dispense') {
+      const defVelMlS = 1400 / countsPerMl;
+      const vel = velMlS || defVelMlS;
+      const vol = ev.volume || 0;
+      const strokes = Math.ceil(vol / syr);
+      const pullTime = strokes * 1;
+      const pushTime = vol / vel;
+      const valveTime = strokes * 0.5;
+      const estSec = Math.ceil(pullTime + pushTime + valveTime);
+      ev.duration = Math.max(estSec, 1);
+      if(estEl && !(velMlS && (velMlS < minMlS || velMlS > maxMlS))) {
+        const pushOnly = Math.ceil(pushTime);
+        estEl.textContent = `≈ ${estSec}s total (pull ~${Math.ceil(pullTime)}s + push ~${pushOnly}s, ${strokes} stroke${strokes>1?'s':''})`;
+      }
+      const durEl = document.getElementById("tlEdDuration");
+      if(durEl) durEl.value = ev.duration;
+    }
   } else {
     if(ev.type !== 'stack') {
       ev.acqPreset = document.getElementById("tlEdAcqPreset").value;
@@ -2378,6 +2863,38 @@ async function tlRunCycle(sorted, progress, running) {
         await tlSleep(ev.duration * 1000);
         if(!tlAbort) await api('pump_stop', pi);
       }
+    } else if(ev.type === 'cavro') {
+      const ci = parseInt(ev.cavroIdx) || 0;
+      const act = ev.cavroAction || 'valve';
+      console.log('Cavro event:', {act, ci, velocity: ev.velocity, velUnit: ev.velUnit, duration: ev.duration});
+      let vel = null;
+      if(ev.velocity !== '' && ev.velocity != null) {
+        vel = parseFloat(ev.velocity);
+        console.log('Cavro vel raw:', vel, 'unit:', ev.velUnit);
+        if(ev.velUnit === 'ulmin') vel = vel / 60000;
+        console.log('Cavro vel mL/s:', vel);
+      }
+      if(act === 'valve') {
+        await api('cavro_switch_valve', ci, ev.fromPort||1);
+        await api('cavro_switch_valve', ci, ev.toPort||2);
+      } else if(act === 'dispense') {
+        await api('cavro_dispense', ci, ev.volume||0.5, ev.fromPort||1, ev.toPort||2, vel);
+      } else if(act === 'continuous') {
+        const pumpTime = Math.max(0, (ev.duration - 4) * 1000);
+        await api('cavro_continuous_start', ci, ev.fromPort||1, ev.toPort||2, vel, 0);
+        await tlSleep(pumpTime);
+        await api('cavro_continuous_stop', ci);
+      } else if(act === 'coordinated') {
+        const pi = parseInt(ev.partnerIdx) || 1;
+        const f1 = parseInt(ev.fromPort) || 1;
+        const t1 = parseInt(ev.toPort) || 2;
+        const f2 = parseInt(ev.outFromPort) || 1;
+        const t2 = parseInt(ev.outToPort) || 3;
+        const pumpTime = Math.max(0, (ev.duration - 4) * 1000);
+        await api('cavro_coordinated_start', ci, pi, f1, t1, f2, t2, vel);
+        await tlSleep(pumpTime);
+        await api('cavro_coordinated_stop');
+      }
     } else {
       await tlApplyPresets(ev);
       await tlSleep(500);
@@ -2412,7 +2929,8 @@ async function tlRunCycle(sorted, progress, running) {
                 il_shutter_open: m.ilShutterOpen != null ? !!m.ilShutterOpen : null,
                 il_nd: m.ilNd ?? null,
                 exposure_ms: a.exposure_ms ?? null,
-                binning: a.binning ?? 1
+                binning: a.binning ?? 1,
+                color: a.color || 'auto'
               });
             }
             const done = waitForCapture();
@@ -2453,7 +2971,7 @@ async function tlRunCycle(sorted, progress, running) {
     if(wait > 0.05) await tlSleep(wait * 1000);
     if(tlAbort) break;
 
-    if(ev.type !== 'pump' && ev.laneId === imgLaneId) {
+    if(ev.type !== 'pump' && ev.type !== 'cavro' && ev.laneId === imgLaneId) {
       imgChain = imgChain.then(() => runEvent(ev));
     } else {
       runEvent(ev);
@@ -2469,9 +2987,8 @@ async function tlRunCycle(sorted, progress, running) {
 
 async function tlPlay() {
   if(!tlEvents.length){ toast("Add events to timeline first","error"); return; }
-  tlRunning = true; tlPaused = false; tlAbort = false;
+  tlRunning = true; tlAbort = false;
   document.getElementById("tlPlayBtn").disabled = true;
-  document.getElementById("tlPauseBtn").disabled = false;
   document.getElementById("tlStopBtn").disabled = false;
   const progress = document.getElementById("tlProgress");
   const ph = document.getElementById("tlPlayhead");
@@ -2498,7 +3015,6 @@ async function tlPlay() {
   tlRunning = false;
   ph.style.left = '-10px';
   document.getElementById("tlPlayBtn").disabled = false;
-  document.getElementById("tlPauseBtn").disabled = true;
   document.getElementById("tlStopBtn").disabled = true;
 
   if(scopeTiConnected) {
@@ -2521,10 +3037,6 @@ async function tlPlay() {
   tlRender();
 }
 
-function tlPause() {
-  tlPaused = !tlPaused;
-  document.getElementById("tlPauseBtn").textContent = tlPaused ? "\u25b6 Resume" : "\u23f8 Pause";
-}
 function tlStop() {
   tlAbort = true;
 }

@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from modules._api import app
 import modules.pumps                   # noqa: F401
+import modules.cavro                   # noqa: F401
 import modules.experiment              # noqa: F401
 import modules.nikon_ti                # noqa: F401
 import modules.coolsnap                # noqa: F401
@@ -85,6 +86,7 @@ import modules.nikon_ti as _ti
 import modules.coolsnap as _cs_mod
 import modules.intensilight as _il
 import modules.pumps as _pumps_mod
+import modules.cavro as _cavro_mod
 
 _shutdown_done = False
 
@@ -114,6 +116,12 @@ def _shutdown():
                 print(f"  Pump {i} disconnected")
             except Exception as e:
                 print(f"  Pump {i} disconnect failed: {e}")
+
+    try:
+        _cavro_mod.disconnect()
+        print("  Cavro bus disconnected")
+    except Exception as e:
+        print(f"  Cavro disconnect failed: {e}")
 
     print("Shutdown complete.")
 

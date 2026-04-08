@@ -608,8 +608,7 @@ def stack_capture(channels, keep_shutter_open=False):
 
     channels: list of dicts, each with:
       objective, filter, lamp_intensity, lamp_on, exposure_ms, binning,
-      il_shutter_open, il_nd
-    keep_shutter_open: if True, open shutter once for entire stack.
+      il_shutter_open, il_nd, shutter_open
     """
     import modules.nikon_ti as ti
     import modules.intensilight as il
@@ -623,9 +622,6 @@ def stack_capture(channels, keep_shutter_open=False):
     use_il = il.is_connected()
     try:
         use_scope = ti.is_connected()
-
-        if keep_shutter_open and use_scope:
-            ti.shutter_open()
 
         for i, ch in enumerate(channels):
             push_event("onCamStatus", "busy",
@@ -661,19 +657,14 @@ def stack_capture(channels, keep_shutter_open=False):
             if binn is not None:
                 set_binning(int(binn))
 
-            if not keep_shutter_open and use_scope:
-                ti.shutter_open()
-
             frame = snap()
             frames.append(frame.copy())
-            filt = ch.get("filter")
-            colors.append(_FILTER_POS_COLOR.get(filt, "none") if filt else "none")
-
-            if not keep_shutter_open and use_scope:
-                ti.shutter_close()
-
-        if keep_shutter_open and use_scope:
-            ti.shutter_close()
+            ch_color = ch.get("color", "auto")
+            if ch_color and ch_color != "auto":
+                colors.append(ch_color)
+            else:
+                filt = ch.get("filter")
+                colors.append(_FILTER_POS_COLOR.get(filt, "none") if filt else "none")
 
     finally:
         try:
@@ -747,16 +738,6 @@ def _capture_worker(mode, **kwargs):
     except Exception as e:
         push_event("onCamStatus", "error", str(e))
     finally:
-        try:
-            import modules.nikon_ti as ti
-            import modules.intensilight as il
-            if ti.is_connected():
-                ti.shutter_close()
-                ti.dia_lamp_off()
-            if il.is_connected():
-                il.shutter_close()
-        except Exception:
-            pass
         if was_live:
             live_start()
 
