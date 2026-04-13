@@ -632,6 +632,9 @@ def stack_capture(channels, keep_shutter_open=False):
     import modules.nikon_ti as ti
     import modules.intensilight as il
 
+    if _capture_thread and _capture_thread.is_alive():
+        _capture_thread.join(timeout=10)
+
     was_live = live_is_active()
     if was_live:
         live_stop()
