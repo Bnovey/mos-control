@@ -8,8 +8,8 @@ between the Python package and the installed PVCAM driver.
 Provides:
   - Live view (WebSocket binary JPEG stream)
   - Snap (single frame capture + save)
-  - Video recording (N frames to .npy)
-  - Time-lapse (frames at an interval, saved as .npy stack)
+  - Video recording (N frames to .tif)
+  - Time-lapse (frames at an interval, saved as .tif stack)
   - Exposure time control (ms)
   - Binning (1x1, 2x2, 4x4, 8x8)
 """
@@ -24,12 +24,14 @@ import json
 import os
 import time
 from datetime import datetime
+import tifffile
 
 _HAS_CV2 = True
 try:
     import cv2
 except ImportError:
     _HAS_CV2 = False
+
 
 _HAS_PIL = True
 try:
@@ -446,8 +448,8 @@ def snap_and_save():
     """Snap a single frame, save to disk, return (frame, path)."""
     frame = snap()
     _ensure_save_dir()
-    path = os.path.join(_save_dir, f"snap_{_timestamp()}.npy")
-    np.save(path, frame)
+    path = os.path.join(_save_dir, f"snap_{_timestamp()}.tif")
+    tifffile.imwrite(path, frame)
     _save_meta(path)
     return frame, path
 
@@ -623,11 +625,11 @@ def record_video(num_frames=100, duration_sec=None, fps=None):
 
 
 def record_video_and_save(num_frames=100, duration_sec=None, fps=None, color=None):
-    """Record video and save to .npy. Returns filepath."""
+    """Record video and save to .tif. Returns filepath."""
     video = record_video(num_frames, duration_sec=duration_sec, fps=fps)
     _ensure_save_dir()
-    path = os.path.join(_save_dir, f"video_{_timestamp()}.npy")
-    np.save(path, video)
+    path = os.path.join(_save_dir, f"video_{_timestamp()}.tif")
+    tifffile.imwrite(path, video)
     _save_meta(path, color=color)
     return path
 
@@ -670,8 +672,8 @@ def timelapse_and_save(num_frames=10, interval_sec=5.0, color=None):
     """Run time-lapse and save. Returns filepath."""
     stack = timelapse(num_frames, interval_sec)
     _ensure_save_dir()
-    path = os.path.join(_save_dir, f"timelapse_{_timestamp()}.npy")
-    np.save(path, stack)
+    path = os.path.join(_save_dir, f"timelapse_{_timestamp()}.tif")
+    tifffile.imwrite(path, stack)
     _save_meta(path, color=color)
     return path
 
@@ -703,7 +705,7 @@ def stack_snap():
 
 
 def stack_finish():
-    """Save all accumulated frames as a single .npy and push event."""
+    """Save all accumulated frames as a single .tif and push event."""
     global _stack_frames
     with _stack_lock:
         if not _stack_frames:
@@ -711,8 +713,8 @@ def stack_finish():
         stacked = np.stack(_stack_frames, axis=0)
         _stack_frames = []
     _ensure_save_dir()
-    path = os.path.join(_save_dir, f"stack_{_timestamp()}.npy")
-    np.save(path, stacked)
+    path = os.path.join(_save_dir, f"stack_{_timestamp()}.tif")
+    tifffile.imwrite(path, stacked)
     _save_meta(path)
     fname = os.path.basename(path)
     push_event("onCamStatus", "idle", f"Saved: {fname}")
@@ -805,8 +807,8 @@ def stack_capture(channels, keep_shutter_open=False):
 
     stacked = np.stack(frames, axis=0)
     _ensure_save_dir()
-    path = os.path.join(_save_dir, f"stack_{_timestamp()}.npy")
-    np.save(path, stacked)
+    path = os.path.join(_save_dir, f"stack_{_timestamp()}.tif")
+    tifffile.imwrite(path, stacked)
     _save_meta(path, colors=colors, channels=channels)
     fname = os.path.basename(path)
     push_event("onCamStatus", "idle", f"Saved: {fname}")
@@ -1096,7 +1098,7 @@ def cam_experiment_end():
 
 @expose
 def cam_list_captures(subdir=None):
-    """List .npy files in a directory, newest first.
+    """List image files (.tif and .npy) in a directory, newest first.
 
     subdir: optional relative path under _base_save_dir (e.g. "exp1/stack").
     If None, lists files in _base_save_dir itself.
@@ -1108,13 +1110,13 @@ def cam_list_captures(subdir=None):
         target = base
     if not os.path.isdir(target):
         return {"files": []}
-    files = [f for f in os.listdir(target) if f.endswith(".npy")]
+    files = [f for f in os.listdir(target) if f.endswith(".tif")]
     files.sort(key=lambda f: os.path.getmtime(os.path.join(target, f)), reverse=True)
     result = []
     for f in files:
         path = os.path.join(target, f)
         try:
-            arr = np.load(path, mmap_mode='r')
+            arr = tifffile.imread(path)
             shape = [int(d) for d in arr.shape]
         except Exception:
             shape = []
@@ -1138,7 +1140,7 @@ def cam_list_experiments():
                 counts = {}
                 for s in subs:
                     sd = os.path.join(d, s)
-                    counts[s] = len([f for f in os.listdir(sd) if f.endswith(".npy")])
+                    counts[s] = len([f for f in os.listdir(sd) if f.endswith(".tif")])
                 experiments.append({"name": name, "types": subs, "counts": counts})
     return {"experiments": experiments}
 
@@ -1199,7 +1201,7 @@ def cam_npy_auto_adjust(filename, frame_idx=0, subdir=None):
     if not os.path.isfile(path):
         return {"error": f"File not found: {filename}"}
     try:
-        arr = np.load(path)
+        arr = tifffile.imread(path)
     except Exception as e:
         return {"error": f"Cannot load: {e}"}
 
@@ -1266,12 +1268,12 @@ def cam_npy_auto_adjust(filename, frame_idx=0, subdir=None):
 
 @expose
 def cam_npy_histogram(filename, frame_idx=0, bins=256):
-    """Return histogram data for a frame in an .npy file."""
+    """Return histogram data for a frame in an image file."""
     path = os.path.join(os.path.normpath(_save_dir), filename)
     if not os.path.isfile(path):
         return {"error": f"File not found: {filename}"}
     try:
-        arr = np.load(path)
+        arr = tifffile.imread(path)
     except Exception as e:
         return {"error": f"Cannot load: {e}"}
 
@@ -1296,7 +1298,7 @@ def cam_npy_histogram(filename, frame_idx=0, bins=256):
 
 @expose
 def cam_npy_stack(filename, mode="max", brightness=0, contrast=100, gamma=1.0, subdir=None):
-    """Return a composite of all frames in an .npy file as a base64 JPEG.
+    """Return a composite of all frames in an image file as a base64 JPEG.
 
     mode: 'max' (max-intensity projection), 'mean' (average), 'sum' (sum clipped),
           'color' (multi-color merge using per-channel pseudo-colors from meta).
@@ -1309,7 +1311,7 @@ def cam_npy_stack(filename, mode="max", brightness=0, contrast=100, gamma=1.0, s
     if not os.path.isfile(path):
         return {"error": f"File not found: {filename}"}
     try:
-        arr = np.load(path)
+        arr = tifffile.imread(path)
     except Exception as e:
         return {"error": f"Cannot load: {e}"}
 
@@ -1421,7 +1423,7 @@ def cam_npy_merge(filename, weights=None, gamma=1.0, subdir=None):
     if not os.path.isfile(path):
         return {"error": f"File not found: {filename}"}
     try:
-        arr = np.load(path)
+        arr = tifffile.imread(path)
     except Exception as e:
         return {"error": f"Cannot load: {e}"}
     if arr.ndim != 3 or arr.shape[0] < 2:
@@ -1503,7 +1505,7 @@ def cam_npy_merge(filename, weights=None, gamma=1.0, subdir=None):
 
 @expose
 def cam_npy_preview(filename, frame_idx=0, brightness=0, contrast=100, gamma=1.0, subdir=None):
-    """Return a base64 JPEG preview of an .npy file.
+    """Return a base64 JPEG preview of an image file.
 
     For 3D arrays (video/timelapse), frame_idx selects which frame.
     Reads the .meta.json sidecar to apply the saved pseudo-color.
@@ -1518,7 +1520,7 @@ def cam_npy_preview(filename, frame_idx=0, brightness=0, contrast=100, gamma=1.0
     if not os.path.isfile(path):
         return {"error": f"File not found: {filename}"}
     try:
-        arr = np.load(path)
+        arr = tifffile.imread(path)
     except Exception as e:
         return {"error": f"Cannot load: {e}"}
 
