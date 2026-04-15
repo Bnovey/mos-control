@@ -615,7 +615,7 @@ option { background:#fff; }
             <div class="section">
               <div class="field">
                 <input type="text" id="acqPresetName" placeholder="Preset name" style="flex:1;min-width:100px">
-                <select id="acqMsPreset" style="min-width:100px"><option value="">Scope preset...</option></select>
+                <select id="acqMsPreset" style="min-width:100px" onchange="acqUpdateSwatch()"><option value="">Scope preset...</option></select>
                 <label style="font-size:10px">Exp (ms)</label>
                 <input type="number" id="acqExposure" value="50" min="1" style="width:70px">
                 <label style="font-size:10px">Bin</label>
@@ -625,18 +625,7 @@ option { background:#fff; }
                   <option value="4">4×</option>
                   <option value="8">8×</option>
                 </select>
-                <label style="font-size:10px">Color</label>
-                <span id="acqColorSwatch" style="display:inline-block;width:14px;height:14px;border:1px solid var(--border);vertical-align:middle;background:#888"></span>
-                <select id="acqColor" style="min-width:70px;font-size:11px" onchange="acqColorChanged()">
-                  <option value="auto">Auto</option>
-                  <option value="none">None</option>
-                  <option value="blue">Blue</option>
-                  <option value="green">Green</option>
-                  <option value="red">Red</option>
-                  <option value="cyan">Cyan</option>
-                  <option value="magenta">Magenta</option>
-                  <option value="yellow">Yellow</option>
-                </select>
+                <span id="acqColorSwatch" style="display:inline-block;width:14px;height:14px;border:1px solid var(--border);border-radius:3px;vertical-align:middle;background:#888" title="Color from filter cube"></span>
                 <button class="btn btn-sm accent" onclick="acqSavePreset()">Save</button>
               </div>
               <div class="preset-list" id="acqPresetList"></div>
@@ -704,10 +693,16 @@ option { background:#fff; }
 
       <!-- ════════ TIMELINE ════════ -->
       <section id="panel-timeline" class="panel">
-        <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
           <div class="panel-title" style="margin-bottom:0">Experiment:</div>
           <input type="text" id="tlExpName" placeholder="enter experiment name"
-                 style="flex:1;max-width:400px;font-size:16px;font-weight:600;padding:6px 10px">
+                 style="flex:1;max-width:300px;font-size:16px;font-weight:600;padding:6px 10px">
+          <button class="btn btn-sm" onclick="expSave()" title="Save experiment to server">Save</button>
+          <select id="expSavedList" style="min-width:120px;font-size:11px"
+                  onchange="expLoadSelected()">
+            <option value="">Load saved...</option>
+          </select>
+          <button class="btn btn-sm red" onclick="expDeleteSelected()" title="Delete selected experiment">&times;</button>
         </div>
         <div class="tl-layout">
 
@@ -867,6 +862,18 @@ option { background:#fff; }
                 <button class="btn btn-sm" onclick="npyBcgReset()">Reset</button>
                 <button class="btn btn-sm" id="npyStackBtn" style="display:none;background:#8b5cf6;border-color:#8b5cf6;color:#fff" onclick="npyStackFrames()">Stack All</button>
                 <button class="btn btn-sm" id="npyMergeBtn" style="display:none;background:#8b5cf6;border-color:#8b5cf6;color:#fff" onclick="npyMergeChannels()">Merge Channels</button>
+              </div>
+            </div>
+            <!-- Per-channel merge controls (stack merge mode) -->
+            <div id="npyMergeControls" style="display:none;width:100%;max-width:600px">
+              <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">
+                Channel Intensity</div>
+              <div id="npyMergeSliders"></div>
+              <div class="npy-controls" style="margin-top:2px">
+                <span style="font-size:11px;color:var(--text3);min-width:55px">Gamma</span>
+                <input type="range" id="npyMergeGamma" min="10" max="500" value="100"
+                       oninput="npyMergeChanged()">
+                <span id="npyMergeGammaVal" style="font-size:11px;min-width:32px;text-align:right">1.0</span>
               </div>
             </div>
             <div id="npyFileInfo" style="font-size:11px;color:var(--text3)"></div>
@@ -1784,9 +1791,8 @@ function acqSavePreset() {
   const binning = parseInt(document.getElementById("acqBinning").value) || 1;
   if(!name){ toast("Enter a name","error"); return; }
   if(!ms){ toast("Select a scope preset","error"); return; }
-  const color = document.getElementById("acqColor").value || 'auto';
   const obj = _loadStore("mos11_acq_presets");
-  obj[name] = { microscopePreset: ms, exposure_ms: exposure, binning: binning, color: color };
+  obj[name] = { microscopePreset: ms, exposure_ms: exposure, binning: binning };
   _saveStore("mos11_acq_presets", obj);
   document.getElementById("acqPresetName").value = "";
   renderAcqPresets();
@@ -1805,28 +1811,29 @@ function acqEditPreset(name) {
   document.getElementById("acqMsPreset").value = p.microscopePreset || '';
   document.getElementById("acqExposure").value = p.exposure_ms || 50;
   document.getElementById("acqBinning").value = p.binning || 1;
-  document.getElementById("acqColor").value = p.color || 'auto';
-  acqColorChanged();
+  acqUpdateSwatch();
 }
 const _ACQ_COLOR_HEX = {
   none:'#888888', blue:'#3b82f6', green:'#22c55e', red:'#ef4444',
-  cyan:'#06b6d4', magenta:'#d946ef', yellow:'#eab308', auto:'#888888'
+  cyan:'#06b6d4', magenta:'#d946ef', yellow:'#eab308'
 };
-function acqColorChanged() {
-  const sel = document.getElementById("acqColor");
+const _FILTER_CUBE_COLOR = {1:'none', 2:'blue', 3:'green', 4:'red'};
+const _FILTER_CUBE_NAME  = {1:'DIA', 2:'DAPI', 3:'GFP', 4:'TxRed'};
+function acqResolveColor(msPresetName) {
+  const msObj = _loadStore("mos11_ms_presets");
+  const m = msObj[msPresetName];
+  return m ? (_FILTER_CUBE_COLOR[m.filter] || 'none') : 'none';
+}
+function acqUpdateSwatch() {
   const swatch = document.getElementById("acqColorSwatch");
-  let displayColor = sel.value;
-  if(sel.value === 'auto') {
-    const msName = document.getElementById("acqMsPreset").value;
+  const msName = document.getElementById("acqMsPreset").value;
+  const color = acqResolveColor(msName);
+  if(swatch) {
+    swatch.style.background = _ACQ_COLOR_HEX[color] || '#888';
     const msObj = _loadStore("mos11_ms_presets");
     const m = msObj[msName];
-    const filterColors = {1:'none',2:'blue',3:'green',4:'red'};
-    displayColor = m ? (filterColors[m.filter] || 'none') : 'none';
-    sel.title = 'Auto: ' + displayColor;
-  } else {
-    sel.title = '';
+    swatch.title = m ? (_FILTER_CUBE_NAME[m.filter] || 'DIA') : '';
   }
-  if(swatch) swatch.style.background = _ACQ_COLOR_HEX[displayColor] || '#888';
 }
 async function acqLoadPreset(name) {
   const obj = _loadStore("mos11_acq_presets");
@@ -1834,8 +1841,8 @@ async function acqLoadPreset(name) {
   document.getElementById("acqPresetName").value = name;
   document.getElementById("acqExposure").value = p.exposure_ms || 50;
   document.getElementById("acqBinning").value = p.binning || 1;
-  document.getElementById("acqColor").value = p.color || 'auto';
-  acqColorChanged();
+  document.getElementById("acqMsPreset").value = p.microscopePreset || '';
+  acqUpdateSwatch();
   const tasks = [];
   if(p.microscopePreset) tasks.push(msLoadPreset(p.microscopePreset));
   if(scopeCamConnected) {
@@ -1847,21 +1854,18 @@ async function acqLoadPreset(name) {
 }
 function renderAcqPresets() {
   const obj = _loadStore("mos11_acq_presets");
+  const msObj = _loadStore("mos11_ms_presets");
   const el = document.getElementById("acqPresetList");
   el.innerHTML = Object.keys(obj).map(n => {
     const p = obj[n];
-    const colorVal = p.color || 'auto';
-    let swatchHex = _ACQ_COLOR_HEX[colorVal] || '#888';
-    if(colorVal === 'auto') {
-      const msObj2 = _loadStore("mos11_ms_presets");
-      const m2 = msObj2[p.microscopePreset];
-      const fc = {1:'none',2:'blue',3:'green',4:'red'};
-      swatchHex = _ACQ_COLOR_HEX[m2 ? (fc[m2.filter]||'none') : 'none'] || '#888';
-    }
+    const m = msObj[p.microscopePreset];
+    const filterColor = m ? (_FILTER_CUBE_COLOR[m.filter] || 'none') : 'none';
+    const cubeName = m ? (_FILTER_CUBE_NAME[m.filter] || 'DIA') : '?';
+    const swatchHex = _ACQ_COLOR_HEX[filterColor] || '#888';
     return `<div class="preset-chip" onclick="acqLoadPreset('${n}')">
       <span>${n}</span>
-      <span style="display:inline-block;width:10px;height:10px;background:${swatchHex};vertical-align:middle;margin:0 2px"></span>
-      <span style="font-size:10px;color:var(--text3)">${p.microscopePreset} — ${p.exposure_ms}ms ${p.binning}x</span>
+      <span style="display:inline-block;width:10px;height:10px;background:${swatchHex};border-radius:2px;vertical-align:middle;margin:0 2px" title="${cubeName}"></span>
+      <span style="font-size:10px;color:var(--text3)">${cubeName} — ${p.exposure_ms}ms ${p.binning}x</span>
       <span class="edit" onclick="event.stopPropagation();acqEditPreset('${n}')">&#9998;</span>
       <span class="del" onclick="event.stopPropagation();acqDeletePreset('${n}')">&times;</span>
     </div>`;
@@ -1872,6 +1876,96 @@ function refreshAcqDropdowns() {
   const msSel = document.getElementById("acqMsPreset");
   msSel.innerHTML = '<option value="">Scope preset...</option>' +
     Object.keys(msObj).map(n=>`<option value="${n}">${n}</option>`).join("");
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EXPERIMENT SAVE / LOAD  (single JSON: presets + timeline + pumps)
+   ═══════════════════════════════════════════════════════════════════════════ */
+function expGatherState() {
+  const durEl = document.getElementById("tlDuration");
+  const unitEl = document.getElementById("tlDurUnit");
+  const repEl = document.getElementById("tlRepeat");
+  const forEl = document.getElementById("tlForever");
+  return {
+    microscopePresets:  _loadStore("mos11_ms_presets"),
+    acquisitionPresets: _loadStore("mos11_acq_presets"),
+    timeline: {
+      events: tlEvents,
+      lanes:  tlLanes,
+      cycleDuration: parseFloat(durEl ? durEl.value : 60),
+      cycleDurationUnit: unitEl ? unitEl.value : 'm',
+      repeatCount: parseInt(repEl ? repEl.value : 1),
+      forever: forEl ? forEl.checked : false
+    }
+  };
+}
+
+function expRestoreState(data) {
+  if(data.microscopePresets) {
+    _saveStore("mos11_ms_presets", data.microscopePresets);
+    renderMsPresets();
+    refreshAcqDropdowns();
+  }
+  if(data.acquisitionPresets) {
+    _saveStore("mos11_acq_presets", data.acquisitionPresets);
+    renderAcqPresets();
+    refreshAcqDropdowns();
+  }
+  if(data.timeline) {
+    const tl = data.timeline;
+    tlEvents = tl.events || [];
+    tlLanes  = tl.lanes  || [{id:"imaging", label:"Imaging", type:"imaging"}];
+    tlSaveEvents(); tlSaveLanes();
+    if(tl.cycleDuration != null) document.getElementById("tlDuration").value = tl.cycleDuration;
+    if(tl.cycleDurationUnit)     document.getElementById("tlDurUnit").value  = tl.cycleDurationUnit;
+    if(tl.repeatCount != null)   document.getElementById("tlRepeat").value   = tl.repeatCount;
+    if(tl.forever != null)       document.getElementById("tlForever").checked = tl.forever;
+    tlSelectedId = null;
+    document.getElementById("tlEditor").classList.remove("open");
+    tlUpdateTotalTime();
+    tlRender();
+  }
+}
+
+async function expSave() {
+  const name = document.getElementById("tlExpName").value.trim();
+  if(!name){ toast("Enter an experiment name first","error"); return; }
+  const payload = expGatherState();
+  const res = await api('experiment_save', name, payload);
+  if(res.error){ toast(res.error,"error"); return; }
+  toast("Experiment saved: " + name, "success");
+  expRefreshList();
+}
+
+async function expLoadSelected() {
+  const sel = document.getElementById("expSavedList");
+  const name = sel.value;
+  if(!name) return;
+  const res = await api('experiment_load', name);
+  if(res.error){ toast(res.error,"error"); sel.value = ''; return; }
+  document.getElementById("tlExpName").value = res.data.name || name;
+  expRestoreState(res.data.payload);
+  toast("Loaded: " + name, "success");
+  sel.value = '';
+}
+
+async function expDeleteSelected() {
+  const sel = document.getElementById("expSavedList");
+  const name = sel.value;
+  if(!name){ toast("Select an experiment to delete","error"); return; }
+  if(!confirm("Delete experiment '" + name + "'?")) return;
+  await api('experiment_delete_saved', name);
+  toast("Deleted: " + name, "info");
+  sel.value = '';
+  expRefreshList();
+}
+
+async function expRefreshList() {
+  const names = await api('experiment_list_saved');
+  const sel = document.getElementById("expSavedList");
+  const opts = '<option value="">Load saved...</option>' +
+    (Array.isArray(names) ? names : []).map(n => `<option value="${n}">${n}</option>`).join("");
+  sel.innerHTML = opts;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2594,13 +2688,18 @@ function tlOpenEditor(ev) {
       <div id="tlFpsWarn" style="font-size:10px;color:var(--red);margin-top:2px;${fpsWarn ? '' : 'display:none'}">${fpsWarn ? `⚠ ${curFps} fps requires <${Math.ceil(1000/curFps)}ms exposure — preset is ${expMs}ms` : ''}</div>`;
     } else if(ev.type === 'stack') {
       const acqObj = _loadStore("mos11_acq_presets");
+      const msObj  = _loadStore("mos11_ms_presets");
       const acqNames = Object.keys(acqObj);
       const selPresets = ev.stackPresets || [];
       let rows = selPresets.map((p, i) => {
         const a = acqObj[p] || {};
+        const m = msObj[a.microscopePreset] || {};
+        const cube = _FILTER_CUBE_NAME[m.filter] || '?';
+        const cubeColor = _FILTER_CUBE_COLOR[m.filter] || 'none';
+        const swHex = _ACQ_COLOR_HEX[cubeColor] || '#888';
         return `<tr>
-          <td style="padding:2px 4px">${p}</td>
-          <td style="padding:2px 4px;font-size:10px;color:var(--text3)">${a.exposure_ms||'?'}ms ${a.binning||'?'}x</td>
+          <td style="padding:2px 4px"><span style="display:inline-block;width:8px;height:8px;background:${swHex};border-radius:2px;vertical-align:middle;margin-right:4px"></span>${p}</td>
+          <td style="padding:2px 4px;font-size:10px;color:var(--text3)">${cube} — ${a.exposure_ms||'?'}ms ${a.binning||'?'}x</td>
           <td style="padding:2px 4px">
             <button class="btn btn-sm" onclick="tlStackChMove(${i},-1)" style="padding:0 4px">&uarr;</button>
             <button class="btn btn-sm" onclick="tlStackChMove(${i},1)" style="padding:0 4px">&darr;</button>
@@ -2902,12 +3001,18 @@ async function tlApplyAcqPreset(presetName) {
     if(a.exposure_ms != null) tasks.push(api('cam_set_exposure', a.exposure_ms));
     if(a.binning != null) tasks.push(api('cam_set_binning', a.binning));
   }
+  const color = acqResolveColor(a.microscopePreset);
+  tasks.push(api('cam_set_pseudo_color', color));
   await Promise.all(tasks);
 }
 
 async function tlApplyPresets(ev) {
   if(ev.acqPreset) await tlApplyAcqPreset(ev.acqPreset);
-  else if(ev.msPreset) await tlApplyMsPreset(ev.msPreset);
+  else if(ev.msPreset) {
+    await tlApplyMsPreset(ev.msPreset);
+    const color = acqResolveColor(ev.msPreset);
+    await api('cam_set_pseudo_color', color);
+  }
 }
 
 function tlSleep(ms) {
@@ -3006,7 +3111,7 @@ async function tlRunCycle(sorted, progress) {
                   il_shutter_open: m.ilShutterOpen != null ? !!m.ilShutterOpen : null,
                   il_nd: m.ilNd ?? null,
                   exposure_ms: a.exposure_ms ?? null, binning: a.binning ?? 1,
-                  color: a.color || 'auto'
+                  color: _FILTER_CUBE_COLOR[m.filter] || 'none'
                 };
               }).filter(Boolean);
               await api('cam_stack_capture', channels, !!ev.keepShutterOpen);
@@ -3074,6 +3179,7 @@ async function tlPlay() {
   }
   if(expRes.error){ toast("Experiment folder: "+expRes.error,"error"); return; }
   logMsg("Experiment folder: "+expRes.path, "exp");
+  api('experiment_save', expName, expGatherState()).catch(()=>{});
   tlRunning = true; tlAbort = false;
   document.getElementById("tlPlayBtn").disabled = true;
   document.getElementById("tlStopBtn").disabled = false;
@@ -3140,6 +3246,7 @@ renderAcqPresets();
 refreshAcqDropdowns();
 tlRender();
 tlUpdateTotalTime();
+expRefreshList();
 logMsg("MOS-11 Control System ready","sys");
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3277,6 +3384,7 @@ function npySelectFile(filename, subdir) {
   });
   npyBcgReset(true);
   document.getElementById("npyBcgControls").style.display = "block";
+  document.getElementById("npyMergeControls").style.display = "none";
 
   const ft = _npyFileTypeCache;
   document.getElementById("npyFrameControls").style.display = (ft === 'video' || ft === 'timelapse') ? 'flex' : 'none';
@@ -3340,7 +3448,7 @@ async function npyAutoAdjust() {
 function npyReloadCurrent() {
   if(!_npyCurrentFile) return;
   if(_npyShowingStack) { npyStackFrames(); return; }
-  if(_npyShowingMerge) { npyMergeChannels(); return; }
+  if(_npyShowingMerge) { _npyDoMerge(); return; }
   if(_npyFileTypeCache === 'stack') {
     const ch = parseInt(document.getElementById("npyChannelSelect").value) || 0;
     npyLoadFrame(_npyCurrentFile, ch);
@@ -3361,16 +3469,20 @@ async function npyLoadFrame(filename, frameIdx) {
   img.style.display = "block";
   document.getElementById("npyPlaceholder").style.display = "none";
 
-  const colorLabel = r.color && r.color !== 'none'
-    ? ` — ${r.color.charAt(0).toUpperCase() + r.color.slice(1)}` : '';
+  const _C2C = {none:'DIA', blue:'DAPI', green:'GFP', red:'TxRed'};
+  const cubeLabel = r.color && r.color !== 'none'
+    ? ` — ${_C2C[r.color] || r.color}` : '';
   const ft = _npyFileTypeCache;
   let dimText;
   if(ft === 'stack') {
-    dimText = `${filename} — Ch ${frameIdx+1}/${r.n_frames}${colorLabel}, ${r.width}×${r.height} px`;
+    const chColors = r.colors || [];
+    const chColor = chColors[frameIdx] || r.color || 'none';
+    const chCube = _C2C[chColor] || chColor;
+    dimText = `${filename} — ${chCube} (${frameIdx+1}/${r.n_frames}), ${r.width}×${r.height} px`;
   } else if(r.n_frames > 1) {
-    dimText = `${filename} — ${r.n_frames} frames, ${r.width}×${r.height} px${colorLabel}`;
+    dimText = `${filename} — ${r.n_frames} frames, ${r.width}×${r.height} px${cubeLabel}`;
   } else {
-    dimText = `${filename} — ${r.width}×${r.height} px${colorLabel}`;
+    dimText = `${filename} — ${r.width}×${r.height} px${cubeLabel}`;
   }
   document.getElementById("npyFileInfo").textContent = dimText;
 
@@ -3440,20 +3552,20 @@ async function npyLoadStackFile(filename, subdir) {
   document.getElementById("npyPlaceholder").style.display = "none";
 
   _npyChannelColors = r.colors || [];
+  const _COLOR_TO_CUBE = {none:'DIA', blue:'DAPI', green:'GFP', red:'TxRed'};
   const sel = document.getElementById("npyChannelSelect");
   sel.innerHTML = '';
   for(let i = 0; i < r.n_frames; i++) {
-    const label = _npyChannelColors[i]
-      ? `${_npyChannelColors[i].charAt(0).toUpperCase() + _npyChannelColors[i].slice(1)}`
-      : `Channel ${i+1}`;
+    const c = _npyChannelColors[i] || 'none';
+    const label = _COLOR_TO_CUBE[c] || c.charAt(0).toUpperCase() + c.slice(1);
     sel.innerHTML += `<option value="${i}">${label}</option>`;
   }
   sel.value = 0;
 
-  const colorLabel = r.color && r.color !== 'none'
-    ? ` — ${r.color.charAt(0).toUpperCase() + r.color.slice(1)}` : '';
+  const ch0Color = _npyChannelColors[0] || r.color || 'none';
+  const ch0Cube = _COLOR_TO_CUBE[ch0Color] || ch0Color;
   document.getElementById("npyFileInfo").textContent =
-    `${filename} — Ch 1/${r.n_frames}${colorLabel}, ${r.width}×${r.height} px`;
+    `${filename} — ${ch0Cube} (1/${r.n_frames}), ${r.width}×${r.height} px`;
 
   if(subdir) {
     const lr = await api('cam_list_captures', subdir);
@@ -3480,6 +3592,9 @@ function npyChannelChanged() {
   _npyShowingMerge = false;
   document.getElementById("npyMergeBtn").textContent = 'Merge Channels';
   document.getElementById("npyMergeBtn").style.background = '#8b5cf6';
+  document.getElementById("npyMergeControls").style.display = "none";
+  document.getElementById("npyBcgControls").style.display = "block";
+  document.getElementById("npyChannelControls").style.display = "flex";
   const ch = parseInt(document.getElementById("npyChannelSelect").value) || 0;
   npyLoadFrame(_npyCurrentFile, ch);
 }
@@ -3495,7 +3610,7 @@ function npyStackTlChanged() {
       el.classList.toggle("active", match);
     });
     if(_npyShowingMerge) {
-      npyMergeChannels();
+      _npyDoMerge();
     } else {
       const ch = parseInt(document.getElementById("npyChannelSelect").value) || 0;
       npyLoadFrame(_npyCurrentFile, ch);
@@ -3528,27 +3643,82 @@ async function npyStackFrames() {
 }
 
 /* ── Stack: merge all channels into multi-color composite ── */
+let _npyMergeDebounce = null;
+let _npyMergeWeights = [];
+const _COLOR_TO_CUBE_M = {none:'DIA', blue:'DAPI', green:'GFP', red:'TxRed'};
+
 async function npyMergeChannels() {
   if(!_npyCurrentFile) return;
-  if(_npyShowingMerge && !_npyBcgDebounce) {
+  if(_npyShowingMerge) {
     _npyShowingMerge = false;
     document.getElementById("npyMergeBtn").textContent = "Merge Channels";
     document.getElementById("npyMergeBtn").style.background = "#8b5cf6";
+    document.getElementById("npyMergeControls").style.display = "none";
+    document.getElementById("npyBcgControls").style.display = "block";
+    document.getElementById("npyChannelControls").style.display = "flex";
     const ch = parseInt(document.getElementById("npyChannelSelect").value) || 0;
     npyLoadFrame(_npyCurrentFile, ch);
     return;
   }
-  const bcg = _npyBcgValues();
-  const r = await api('cam_npy_stack', _npyCurrentFile, 'color',
-                       bcg.brightness, bcg.contrast, bcg.gamma, _npySubdir);
-  if(r.error) { toast(r.error, "error"); return; }
   _npyShowingMerge = true;
   document.getElementById("npyMergeBtn").textContent = "Single Channel";
   document.getElementById("npyMergeBtn").style.background = "#059669";
+  document.getElementById("npyBcgControls").style.display = "none";
+  document.getElementById("npyChannelControls").style.display = "none";
+  document.getElementById("npyMergeControls").style.display = "block";
+  document.getElementById("npyMergeGamma").value = 100;
+  document.getElementById("npyMergeGammaVal").textContent = "1.0";
+  _npyMergeWeights = _npyChannelColors.map(() => 1.0);
+  _npyBuildMergeSliders();
+  await _npyDoMerge();
+}
+
+function _npyBuildMergeSliders() {
+  const container = document.getElementById("npyMergeSliders");
+  container.innerHTML = '';
+  for(let i = 0; i < _npyChannelColors.length; i++) {
+    const c = _npyChannelColors[i] || 'none';
+    const cube = _COLOR_TO_CUBE_M[c] || c;
+    const hex = _ACQ_COLOR_HEX[c] || '#888';
+    const row = document.createElement("div");
+    row.className = "npy-controls";
+    row.innerHTML = `
+      <span style="display:inline-block;width:10px;height:10px;background:${hex};border-radius:2px;flex-shrink:0"></span>
+      <span style="font-size:11px;color:var(--text2);min-width:40px">${cube}</span>
+      <input type="range" id="npyMergeW${i}" min="0" max="100" value="100"
+             style="flex:1;accent-color:${hex}" oninput="npyMergeSliderChanged(${i})">
+      <span id="npyMergeWVal${i}" style="font-size:11px;min-width:28px;text-align:right">100</span>`;
+    container.appendChild(row);
+  }
+}
+
+function npyMergeSliderChanged(idx) {
+  const val = parseInt(document.getElementById(`npyMergeW${idx}`).value);
+  document.getElementById(`npyMergeWVal${idx}`).textContent = val;
+  _npyMergeWeights[idx] = val / 100.0;
+  clearTimeout(_npyMergeDebounce);
+  _npyMergeDebounce = setTimeout(() => _npyDoMerge(), 100);
+}
+
+function npyMergeChanged() {
+  const g = parseInt(document.getElementById("npyMergeGamma").value);
+  document.getElementById("npyMergeGammaVal").textContent = (g / 100).toFixed(2);
+  clearTimeout(_npyMergeDebounce);
+  _npyMergeDebounce = setTimeout(() => _npyDoMerge(), 100);
+}
+
+async function _npyDoMerge() {
+  if(!_npyCurrentFile || !_npyShowingMerge) return;
+  const gamma = parseInt(document.getElementById("npyMergeGamma").value) / 100.0;
+  const r = await api('cam_npy_merge', _npyCurrentFile, _npyMergeWeights, gamma, _npySubdir);
+  if(r.error) { toast(r.error, "error"); return; }
   const img = document.getElementById("npyImage");
   img.src = "data:image/jpeg;base64," + r.image;
+  img.style.display = "block";
+  document.getElementById("npyPlaceholder").style.display = "none";
+  const labels = (r.colors || []).map(c => _COLOR_TO_CUBE_M[c] || c).join(' + ');
   document.getElementById("npyFileInfo").textContent =
-    `${_npyCurrentFile} — Multi-color merge of ${r.n_frames} channels, ${r.width}×${r.height} px`;
+    `${_npyCurrentFile} — Merge: ${labels}, ${r.width}×${r.height} px`;
 }
 
 onEvent("onCamCaptureComplete", function(filename) {

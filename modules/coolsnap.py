@@ -308,11 +308,11 @@ def _gather_system_state():
     return state
 
 
-def _save_meta(npy_path, colors=None, channels=None):
+def _save_meta(npy_path, colors=None, channels=None, color=None):
     """Write a sidecar .meta.json with full system state snapshot."""
     meta = {
         "timestamp": datetime.now().isoformat(),
-        "color": _pseudo_color_name,
+        "color": color if color is not None else _pseudo_color_name,
     }
     if colors:
         meta["colors"] = colors
@@ -333,9 +333,17 @@ def connect():
     with _lock:
         if _hcam is not None:
             return  # already open — nothing to do
-        if not _pvc_initialized:
-            pvc.init()
-            _pvc_initialized = True
+        # Always do a full uninit/init cycle to reset the PVCAM SDK and
+        # FireWire interface — this is what Micro-Manager does and it clears
+        # stale camera states left over from crashes or forced shutdowns.
+        if _pvc_initialized:
+            try:
+                pvc.uninit()
+            except Exception:
+                pass
+            _pvc_initialized = False
+        pvc.init()
+        _pvc_initialized = True
         n = pvc.cam_count()
         if n < 1:
             raise CamError("No PVCAM cameras found")
@@ -614,17 +622,13 @@ def record_video(num_frames=100, duration_sec=None, fps=None):
     return np.stack(frames, axis=0)
 
 
-def record_video_and_save(num_frames=100, duration_sec=None, fps=None):
+def record_video_and_save(num_frames=100, duration_sec=None, fps=None, color=None):
     """Record video and save to .npy. Returns filepath."""
-    global _pseudo_color, _pseudo_color_name
     video = record_video(num_frames, duration_sec=duration_sec, fps=fps)
     _ensure_save_dir()
     path = os.path.join(_save_dir, f"video_{_timestamp()}.npy")
     np.save(path, video)
-    prev_color, prev_name = _pseudo_color, _pseudo_color_name
-    _pseudo_color, _pseudo_color_name = None, "none"
-    _save_meta(path)
-    _pseudo_color, _pseudo_color_name = prev_color, prev_name
+    _save_meta(path, color=color)
     return path
 
 
@@ -662,13 +666,13 @@ def timelapse(num_frames=10, interval_sec=5.0):
     return np.stack(frames, axis=0)
 
 
-def timelapse_and_save(num_frames=10, interval_sec=5.0):
+def timelapse_and_save(num_frames=10, interval_sec=5.0, color=None):
     """Run time-lapse and save. Returns filepath."""
     stack = timelapse(num_frames, interval_sec)
     _ensure_save_dir()
     path = os.path.join(_save_dir, f"timelapse_{_timestamp()}.npy")
     np.save(path, stack)
-    _save_meta(path)
+    _save_meta(path, color=color)
     return path
 
 
@@ -832,6 +836,7 @@ def _run_capture(mode, **kwargs):
 
 
 def _capture_worker(mode, **kwargs):
+    color = kwargs.pop('_color', _pseudo_color_name)
     was_live = live_is_active()
     if was_live:
         live_stop()
@@ -840,13 +845,13 @@ def _capture_worker(mode, **kwargs):
         if mode == "video":
             push_event("onCamStatus", "recording",
                         f"Recording {kwargs.get('num_frames', 100)} frames...")
-            path = record_video_and_save(**kwargs)
+            path = record_video_and_save(color=color, **kwargs)
         elif mode == "timelapse":
             n = kwargs.get('num_frames', 10)
             iv = kwargs.get('interval_sec', 5)
             push_event("onCamStatus", "recording",
                         f"Time-lapse: {n} frames, {iv}s interval...")
-            path = timelapse_and_save(**kwargs)
+            path = timelapse_and_save(color=color, **kwargs)
         elif mode == "snap":
             push_event("onCamStatus", "snapping", "Snapping image...")
             _, path = snap_and_save()
@@ -969,7 +974,7 @@ def cam_live_active():
 @expose
 def cam_record_video(num_frames=100, duration_sec=None, fps=None):
     try:
-        kw = {}
+        kw = {"_color": _pseudo_color_name}
         if duration_sec is not None:
             kw["duration_sec"] = float(duration_sec)
         else:
@@ -986,7 +991,8 @@ def cam_record_video(num_frames=100, duration_sec=None, fps=None):
 def cam_record_timelapse(num_frames=10, interval_sec=5.0):
     try:
         _run_capture("timelapse", num_frames=int(num_frames),
-                     interval_sec=float(interval_sec))
+                     interval_sec=float(interval_sec),
+                     _color=_pseudo_color_name)
         return {"ok": True, "msg": f"Timelapse: {num_frames} frames, {interval_sec}s interval..."}
     except Exception as e:
         return {"error": str(e)}
@@ -1397,6 +1403,101 @@ def cam_npy_stack(filename, mode="max", brightness=0, contrast=100, gamma=1.0, s
         "height": int(composite.shape[0]),
         "n_frames": int(arr.shape[0]),
         "mode": mode,
+    }
+
+
+@expose
+def cam_npy_merge(filename, weights=None, gamma=1.0, subdir=None):
+    """Merge stack channels into an RGB composite with per-channel intensity.
+
+    weights: list of floats (0.0–1.0), one per channel. Controls intensity.
+             If None, all channels at 1.0.
+    gamma: global gamma correction.
+    """
+    base = os.path.normpath(_base_save_dir) if subdir else os.path.normpath(_save_dir)
+    if subdir:
+        base = os.path.join(base, subdir)
+    path = os.path.join(base, filename)
+    if not os.path.isfile(path):
+        return {"error": f"File not found: {filename}"}
+    try:
+        arr = np.load(path)
+    except Exception as e:
+        return {"error": f"Cannot load: {e}"}
+    if arr.ndim != 3 or arr.shape[0] < 2:
+        return {"error": "Need a multi-channel stack"}
+
+    meta_colors = None
+    meta_path = path + ".meta.json"
+    if os.path.isfile(meta_path):
+        try:
+            with open(meta_path) as f:
+                meta_colors = json.load(f).get("colors")
+        except Exception:
+            pass
+
+    gamma = float(gamma)
+    n_ch, h, w = arr.shape
+    if weights is None:
+        weights = [1.0] * n_ch
+    else:
+        weights = [float(x) for x in weights]
+        while len(weights) < n_ch:
+            weights.append(1.0)
+
+    canvas = np.zeros((h, w, 3), dtype=np.float64)
+    for i in range(n_ch):
+        if weights[i] <= 0:
+            continue
+        frame = arr[i].astype(np.float64)
+        lo = float(np.percentile(frame, 0.5))
+        hi = float(np.percentile(frame, 99.5))
+        if hi <= lo:
+            hi = lo + 1
+        norm = np.clip((frame - lo) / (hi - lo), 0, 1)
+        c_name = (meta_colors[i] if meta_colors and i < len(meta_colors)
+                  else "none")
+        rgb = _PSEUDO_COLOR_MAP.get(c_name)
+        if rgb:
+            for ch in range(3):
+                canvas[:, :, ch] += norm * (rgb[ch] / 255.0) * weights[i]
+        else:
+            for ch in range(3):
+                canvas[:, :, ch] += norm * weights[i]
+
+    if gamma != 1.0:
+        canvas = np.power(np.clip(canvas, 0, 1), 1.0 / gamma)
+    else:
+        canvas = np.clip(canvas, 0, 1)
+
+    u8 = (canvas * 255).astype(np.uint8)
+
+    scale = max(1, max(h, w) // 1200)
+    if scale > 1:
+        u8 = u8[::scale, ::scale]
+
+    if _HAS_CV2:
+        bgr = cv2.cvtColor(u8, cv2.COLOR_RGB2BGR)
+        ok, buf = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        b64 = base64.b64encode(buf.tobytes()).decode("ascii") if ok else ""
+    elif _HAS_PIL:
+        img = _PILImage.fromarray(u8, mode="RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=90)
+        b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    else:
+        b64 = ""
+
+    colors_out = []
+    for i in range(n_ch):
+        colors_out.append(meta_colors[i] if meta_colors and i < len(meta_colors)
+                          else "none")
+
+    return {
+        "image": b64,
+        "width": int(u8.shape[1]), "height": int(u8.shape[0]),
+        "n_frames": n_ch,
+        "colors": colors_out,
     }
 
 
