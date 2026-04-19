@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MOS-11 Modular Control System
+Mosaic Control Center
 ──────────────────────────────
 Flask-based web server with WebSocket live-view streaming.
 Uses real OS threads (no gevent) so blocking hardware drivers never stall HTTP.
@@ -131,14 +131,14 @@ signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="MOS-11 Control System")
+    parser = argparse.ArgumentParser(description="Mosaic Control Center")
     parser.add_argument("--host", default="0.0.0.0",
                         help="Listen address (default 0.0.0.0)")
     parser.add_argument("--port", type=int, default=8081,
                         help="Listen port (default 8081)")
     args = parser.parse_args()
 
-    print("MOS-11 Control System")
+    print("Mosaic Control Center")
     print(f"  Local:   http://localhost:{args.port}")
     print(f"  Network: http://<this-machine-ip>:{args.port}")
     app.run(host=args.host, port=args.port, threaded=True)

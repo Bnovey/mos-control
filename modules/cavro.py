@@ -44,13 +44,28 @@ def _patch_pump_for_concurrency(pump):
             return orig_cmd_raw(*args, **kwargs)
     pump.command_request_raw = _locked_cmd_raw
 
-    def _wait(poll_interval=0.02):
+    def _wait(poll_interval=0.5):
         start = time.time()
-        while not pump.ready(log=False):
+        serial_errors = 0
+        max_serial_errors = 10
+        while True:
             if pump.wait_timeout is not None and (time.time() - start) > pump.wait_timeout:
-                from tecan_cavro import TecanCavroReadyTimeout
+                from syringe_pump.tecan_cavro import TecanCavroReadyTimeout
                 raise TecanCavroReadyTimeout(
                     f'Timeout waiting for Cavro (address: {pump.address})')
+            try:
+                if pump.ready(log=False):
+                    return
+                serial_errors = 0
+            except Exception as e:
+                serial_errors += 1
+                backoff = min(poll_interval * (2 ** serial_errors), 10)
+                print(f"[Cavro P{pump.address}] serial error during poll "
+                      f"({serial_errors}/{max_serial_errors}): {e}")
+                if serial_errors >= max_serial_errors:
+                    raise
+                time.sleep(backoff)
+                continue
             time.sleep(poll_interval)
     pump.wait_for_ready = _wait
 
@@ -200,7 +215,7 @@ def cavro_dispense(idx, volume_ml, from_port, to_port, velocity_ml=None):
         }
         if velocity_ml is not None:
             vel_counts = min(float(velocity_ml) * pump.counts_per_ml, max_v)
-            kwargs["dispense_velocity_counts"] = max(1, round(vel_counts))
+            kwargs["dispense_velocity_counts"] = max(3, round(vel_counts))
         pump.dispense_ml(
             float(volume_ml),
             from_port=int(from_port),
@@ -362,7 +377,7 @@ def _continuous_thread(idx, from_port, to_port, velocity_ml, cycles, ready=None)
     # Convert mL/s to counts/s, clamped to pump max
     max_v = int(5800 / pump.velocity_scale)
     if velocity_ml:
-        dispense_vel = max(1, min(round(velocity_ml * pump.counts_per_ml), max_v))
+        dispense_vel = max(3, min(round(velocity_ml * pump.counts_per_ml), max_v))
     else:
         dispense_vel = None
     n = 0
@@ -438,6 +453,9 @@ def _continuous_thread(idx, from_port, to_port, velocity_ml, cycles, ready=None)
         push_event("onCavroContinuousUpdate", idx, status,
                    f"Continuous {status}: {n} cycles, {total:.2f} mL")
     except Exception as e:
+        import traceback
+        print(f"[Cavro C{idx+1}] ERROR: {e}")
+        traceback.print_exc()
         if ready:
             ready.set()
         try:
@@ -526,7 +544,7 @@ def _coordinated_thread(idx1, idx2, from1, to1, from2, to2, velocity_ml, ready=N
     max_vel = min(pump1.counts_per_stroke, max_v)
 
     if velocity_ml:
-        push_vel = max(1, min(round(velocity_ml * pump1.counts_per_ml), max_v))
+        push_vel = max(3, min(round(velocity_ml * pump1.counts_per_ml), max_v))
     else:
         push_vel = max_vel
 
@@ -622,6 +640,9 @@ def _coordinated_thread(idx1, idx2, from1, to1, from2, to2, velocity_ml, ready=N
         push_event("onCavroCoordinatedUpdate", status,
                    f"Coordinated {status}: {n} cycles, {total:.2f} mL")
     except Exception as e:
+        import traceback
+        print(f"[Cavro COORD] ERROR: {e}")
+        traceback.print_exc()
         if ready:
             ready.set()
         for p in (pump1, pump2):

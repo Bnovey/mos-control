@@ -1,1 +1,1 @@
-"""MOS-11 control system modules: pumps, camera, experiment orchestration."""
+"""Mosaic Control Center modules: pumps, camera, experiment orchestration."""

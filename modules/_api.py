@@ -1,5 +1,5 @@
 """
-Shared Flask application and helpers for all MOS-11 modules.
+Shared Flask application and helpers for all Mosaic Control Center modules.
 
 Replaces Eel with plain Flask — no gevent, no monkey-patching, real OS threads.
 Each @expose'd function becomes a POST /api/<name> endpoint.
@@ -96,3 +96,13 @@ def _get_events():
     with _events_lock:
         new = [e for e in _events if e["id"] > since]
     return jsonify(new)
+
+
+# ── Export file download ─────────────────────────────────────────────────────
+
+_EXPORTS_DIR = os.path.join(os.path.dirname(__file__), "..", "exports")
+
+@app.route("/api/export/download/<path:filename>")
+def _export_download(filename):
+    return send_from_directory(os.path.abspath(_EXPORTS_DIR), filename,
+                               as_attachment=True)

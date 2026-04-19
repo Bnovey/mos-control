@@ -63,6 +63,10 @@ _capture_stop = threading.Event()
 _save_dir = os.path.join(os.path.dirname(__file__), "..", "captures")
 _base_save_dir = _save_dir
 
+_experiment_json_path = None
+_experiment_meta = None
+_experiment_lock = threading.Lock()
+
 _frame_lock = threading.Lock()
 _latest_jpeg = None          # raw JPEG bytes for WebSocket stream
 _frame_event = threading.Event()
@@ -224,6 +228,22 @@ def _timestamp():
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
+def _next_name(prefix, ext=".tif", directory=None):
+    """Return the next sequential filename like 'video_1.tif', 'video_2.tif', etc."""
+    d = directory or _save_dir
+    existing = set()
+    if os.path.isdir(d):
+        for f in os.listdir(d):
+            if f.startswith(prefix + "_") and f.endswith(ext):
+                stem = f[len(prefix) + 1 : -len(ext)]
+                if stem.isdigit():
+                    existing.add(int(stem))
+    n = 1
+    while n in existing:
+        n += 1
+    return f"{prefix}_{n}{ext}"
+
+
 def _safe(fn):
     """Call fn(), return result or None on any error/timeout."""
     try:
@@ -310,22 +330,61 @@ def _gather_system_state():
     return state
 
 
-def _save_meta(npy_path, colors=None, channels=None, color=None):
-    """Write a sidecar .meta.json with full system state snapshot."""
-    meta = {
+def _save_experiment_json():
+    """Write the in-memory experiment metadata to experiment.json."""
+    if _experiment_json_path is None or _experiment_meta is None:
+        return
+    try:
+        with open(_experiment_json_path, "w") as f:
+            json.dump(_experiment_meta, f, indent=2, default=str)
+    except Exception:
+        pass
+
+
+def _record_capture(tif_path, color=None, colors=None):
+    """Record a capture in the experiment JSON. No-op outside an experiment."""
+    if _experiment_meta is None:
+        return
+    exp_dir = os.path.dirname(_experiment_json_path)
+    rel_key = os.path.relpath(tif_path, exp_dir).replace("\\", "/")
+    entry = {
         "timestamp": datetime.now().isoformat(),
         "color": color if color is not None else _pseudo_color_name,
     }
     if colors:
-        meta["colors"] = colors
-    if channels:
-        meta["channels"] = channels
-    meta["system"] = _gather_system_state()
+        entry["colors"] = colors
+    with _experiment_lock:
+        _experiment_meta["captures"][rel_key] = entry
+        _save_experiment_json()
+
+
+def _get_capture_meta(tif_path):
+    """Look up (color, colors) for a capture from its experiment.json.
+
+    Walks up from the file to find the experiment root containing
+    experiment.json, then looks up the relative path in the captures dict.
+    Returns ("none", None) if not found.
+    """
+    d = os.path.dirname(tif_path)
+    basename = os.path.basename(d)
+    if basename in ("video", "stack", "timelapse"):
+        exp_root = os.path.dirname(d)
+    else:
+        exp_root = d
+    exp_json = os.path.join(exp_root, "experiment.json")
+    if not os.path.isfile(exp_json):
+        return "none", None
     try:
-        with open(npy_path + ".meta.json", "w") as f:
-            json.dump(meta, f, indent=2, default=str)
+        with open(exp_json) as f:
+            data = json.load(f)
     except Exception:
-        pass
+        return "none", None
+    captures = data.get("captures", {})
+    rel_key = os.path.relpath(tif_path, exp_root).replace("\\", "/")
+    entry = captures.get(rel_key)
+    if entry is None:
+        return "none", None
+    return entry.get("color", "none"), entry.get("colors")
 
 
 # ── Connection ───────────────────────────────────────────────────────────────
@@ -448,9 +507,9 @@ def snap_and_save():
     """Snap a single frame, save to disk, return (frame, path)."""
     frame = snap()
     _ensure_save_dir()
-    path = os.path.join(_save_dir, f"snap_{_timestamp()}.tif")
+    path = os.path.join(_save_dir, _next_name("snap"))
     tifffile.imwrite(path, frame)
-    _save_meta(path)
+    _record_capture(path)
     return frame, path
 
 
@@ -628,9 +687,9 @@ def record_video_and_save(num_frames=100, duration_sec=None, fps=None, color=Non
     """Record video and save to .tif. Returns filepath."""
     video = record_video(num_frames, duration_sec=duration_sec, fps=fps)
     _ensure_save_dir()
-    path = os.path.join(_save_dir, f"video_{_timestamp()}.tif")
+    path = os.path.join(_save_dir, _next_name("video"))
     tifffile.imwrite(path, video)
-    _save_meta(path, color=color)
+    _record_capture(path, color=color)
     return path
 
 
@@ -672,9 +731,9 @@ def timelapse_and_save(num_frames=10, interval_sec=5.0, color=None):
     """Run time-lapse and save. Returns filepath."""
     stack = timelapse(num_frames, interval_sec)
     _ensure_save_dir()
-    path = os.path.join(_save_dir, f"timelapse_{_timestamp()}.tif")
+    path = os.path.join(_save_dir, _next_name("timelapse"))
     tifffile.imwrite(path, stack)
-    _save_meta(path, color=color)
+    _record_capture(path, color=color)
     return path
 
 
@@ -713,9 +772,9 @@ def stack_finish():
         stacked = np.stack(_stack_frames, axis=0)
         _stack_frames = []
     _ensure_save_dir()
-    path = os.path.join(_save_dir, f"stack_{_timestamp()}.tif")
+    path = os.path.join(_save_dir, _next_name("stack"))
     tifffile.imwrite(path, stacked)
-    _save_meta(path)
+    _record_capture(path)
     fname = os.path.basename(path)
     push_event("onCamStatus", "idle", f"Saved: {fname}")
     push_event("onCamCaptureComplete", fname)
@@ -807,9 +866,9 @@ def stack_capture(channels, keep_shutter_open=False):
 
     stacked = np.stack(frames, axis=0)
     _ensure_save_dir()
-    path = os.path.join(_save_dir, f"stack_{_timestamp()}.tif")
+    path = os.path.join(_save_dir, _next_name("stack"))
     tifffile.imwrite(path, stacked)
-    _save_meta(path, colors=colors, channels=channels)
+    _record_capture(path, colors=colors)
     fname = os.path.basename(path)
     push_event("onCamStatus", "idle", f"Saved: {fname}")
     push_event("onCamCaptureComplete", fname)
@@ -1067,14 +1126,31 @@ def cam_get_save_dir():
     return _save_dir
 
 
+def _sanitize_filename(name):
+    """Replace characters that are illegal in Windows paths."""
+    import re
+    name = re.sub(r'[<>:"/\\|?*]', '_', name)
+    name = name.strip('. ')
+    return name or "experiment"
+
+
 @expose
 def cam_experiment_start(name):
     """Create an experiment folder with timelapse/video/stack subfolders."""
-    global _save_dir
+    global _save_dir, _experiment_json_path, _experiment_meta
+    name = _sanitize_filename(name)
     exp_dir = os.path.join(_base_save_dir, name)
     for sub in ("timelapse", "video", "stack"):
         os.makedirs(os.path.join(exp_dir, sub), exist_ok=True)
     _save_dir = exp_dir
+    _experiment_json_path = os.path.join(exp_dir, "experiment.json")
+    _experiment_meta = {
+        "name": name,
+        "saved": datetime.now().isoformat(),
+        "payload": {},
+        "captures": {},
+    }
+    _save_experiment_json()
     return {"ok": True, "path": exp_dir}
 
 
@@ -1091,9 +1167,23 @@ def cam_experiment_set_subdir(subdir):
 @expose
 def cam_experiment_end():
     """Reset save directory back to the base captures folder."""
-    global _save_dir
+    global _save_dir, _experiment_json_path, _experiment_meta
     _save_dir = _base_save_dir
+    _experiment_json_path = None
+    _experiment_meta = None
     return {"ok": True, "path": _save_dir}
+
+
+@expose
+def cam_experiment_set_payload(payload):
+    """Store presets + timeline config into the experiment JSON."""
+    if _experiment_meta is None:
+        return {"error": "No experiment in progress"}
+    with _experiment_lock:
+        _experiment_meta["payload"] = payload
+        _experiment_meta["saved"] = datetime.now().isoformat()
+        _save_experiment_json()
+    return {"ok": True}
 
 
 @expose
@@ -1145,19 +1235,25 @@ def cam_list_experiments():
     return {"experiments": experiments}
 
 
-def _apply_bcg(frame, brightness=0, contrast=100, gamma=1.0, max_dim=1200):
+def _apply_bcg(frame, brightness=0, contrast=100, gamma=1.0, max_dim=1200,
+               display_min=None, display_max=None):
     """Apply brightness/contrast/gamma adjustments to a uint16 frame → uint8.
 
     At default settings (b=0, c=100, g=1.0) maps the full data range to 0-255.
     contrast > 100 tightens the window (brighter), < 100 widens it (darker).
     brightness shifts the window center.
     gamma: 0.1-5.0 (1.0 = linear). Applied via LUT.
+    display_min/display_max: if both provided, lock the display range instead
+    of auto-ranging per frame (prevents brightness flicker during playback).
     """
     h, w = frame.shape
     scale = max(1, max(h, w) // max_dim) if max_dim else 1
     small = frame[::scale, ::scale] if scale > 1 else frame
 
-    lo, hi = _auto_range(small)
+    if display_min is not None and display_max is not None:
+        lo, hi = float(display_min), float(display_max)
+    else:
+        lo, hi = _auto_range(small)
     rng = hi - lo
     center = (lo + hi) / 2.0
 
@@ -1186,9 +1282,9 @@ def _apply_bcg(frame, brightness=0, contrast=100, gamma=1.0, max_dim=1200):
         if r: rgb[:, :, 0] = (u8.astype(np.uint16) * r // 255).astype(np.uint8)
         if g: rgb[:, :, 1] = (u8.astype(np.uint16) * g // 255).astype(np.uint8)
         if b: rgb[:, :, 2] = (u8.astype(np.uint16) * b // 255).astype(np.uint8)
-        return rgb
+        return rgb, lo, hi
 
-    return u8
+    return u8, lo, hi
 
 
 @expose
@@ -1318,17 +1414,7 @@ def cam_npy_stack(filename, mode="max", brightness=0, contrast=100, gamma=1.0, s
     if arr.ndim != 3 or arr.shape[0] < 2:
         return {"error": "Need a multi-frame file to stack"}
 
-    meta_color = "none"
-    meta_colors = None
-    meta_path = path + ".meta.json"
-    if os.path.isfile(meta_path):
-        try:
-            with open(meta_path) as f:
-                meta = json.load(f)
-            meta_color = meta.get("color", "none")
-            meta_colors = meta.get("colors")
-        except Exception:
-            pass
+    meta_color, meta_colors = _get_capture_meta(path)
 
     brightness, contrast, gamma = float(brightness), float(contrast), float(gamma)
 
@@ -1381,7 +1467,7 @@ def cam_npy_stack(filename, mode="max", brightness=0, contrast=100, gamma=1.0, s
     _pseudo_color = _PSEUDO_COLOR_MAP.get(meta_color)
     _pseudo_color_name = meta_color
     try:
-        u8 = _apply_bcg(composite, brightness, contrast, gamma, max_dim=1200)
+        u8, _, _ = _apply_bcg(composite, brightness, contrast, gamma, max_dim=1200)
         if _HAS_CV2:
             if u8.ndim == 3:
                 u8 = cv2.cvtColor(u8, cv2.COLOR_RGB2BGR)
@@ -1409,12 +1495,14 @@ def cam_npy_stack(filename, mode="max", brightness=0, contrast=100, gamma=1.0, s
 
 
 @expose
-def cam_npy_merge(filename, weights=None, gamma=1.0, subdir=None):
+def cam_npy_merge(filename, weights=None, gamma=1.0, subdir=None, ranges=None):
     """Merge stack channels into an RGB composite with per-channel intensity.
 
     weights: list of floats (0.0–1.0), one per channel. Controls intensity.
              If None, all channels at 1.0.
     gamma: global gamma correction.
+    ranges: list of [lo, hi] per channel to lock normalization. If None,
+            auto-ranges each channel (0.5–99.5 percentile).
     """
     base = os.path.normpath(_base_save_dir) if subdir else os.path.normpath(_save_dir)
     if subdir:
@@ -1429,14 +1517,7 @@ def cam_npy_merge(filename, weights=None, gamma=1.0, subdir=None):
     if arr.ndim != 3 or arr.shape[0] < 2:
         return {"error": "Need a multi-channel stack"}
 
-    meta_colors = None
-    meta_path = path + ".meta.json"
-    if os.path.isfile(meta_path):
-        try:
-            with open(meta_path) as f:
-                meta_colors = json.load(f).get("colors")
-        except Exception:
-            pass
+    _, meta_colors = _get_capture_meta(path)
 
     gamma = float(gamma)
     n_ch, h, w = arr.shape
@@ -1447,15 +1528,20 @@ def cam_npy_merge(filename, weights=None, gamma=1.0, subdir=None):
         while len(weights) < n_ch:
             weights.append(1.0)
 
+    computed_ranges = []
     canvas = np.zeros((h, w, 3), dtype=np.float64)
     for i in range(n_ch):
-        if weights[i] <= 0:
-            continue
         frame = arr[i].astype(np.float64)
-        lo = float(np.percentile(frame, 0.5))
-        hi = float(np.percentile(frame, 99.5))
+        if ranges and i < len(ranges) and ranges[i] is not None:
+            lo, hi = float(ranges[i][0]), float(ranges[i][1])
+        else:
+            lo = float(np.percentile(frame, 0.5))
+            hi = float(np.percentile(frame, 99.5))
         if hi <= lo:
             hi = lo + 1
+        computed_ranges.append([lo, hi])
+        if weights[i] <= 0:
+            continue
         norm = np.clip((frame - lo) / (hi - lo), 0, 1)
         c_name = (meta_colors[i] if meta_colors and i < len(meta_colors)
                   else "none")
@@ -1500,16 +1586,19 @@ def cam_npy_merge(filename, weights=None, gamma=1.0, subdir=None):
         "width": int(u8.shape[1]), "height": int(u8.shape[0]),
         "n_frames": n_ch,
         "colors": colors_out,
+        "ranges": computed_ranges,
     }
 
 
 @expose
-def cam_npy_preview(filename, frame_idx=0, brightness=0, contrast=100, gamma=1.0, subdir=None):
+def cam_npy_preview(filename, frame_idx=0, brightness=0, contrast=100, gamma=1.0,
+                    subdir=None, display_min=None, display_max=None):
     """Return a base64 JPEG preview of an image file.
 
     For 3D arrays (video/timelapse), frame_idx selects which frame.
-    Reads the .meta.json sidecar to apply the saved pseudo-color.
+    Reads pseudo-color from experiment.json if available.
     brightness/contrast/gamma allow viewer-side image adjustments.
+    display_min/display_max: lock display range to prevent brightness flicker.
     subdir: optional relative path under _base_save_dir.
     """
     global _pseudo_color, _pseudo_color_name
@@ -1528,17 +1617,7 @@ def cam_npy_preview(filename, frame_idx=0, brightness=0, contrast=100, gamma=1.0
     contrast = float(contrast)
     gamma = float(gamma)
 
-    meta_color = "none"
-    meta_colors = None
-    meta_path = path + ".meta.json"
-    if os.path.isfile(meta_path):
-        try:
-            with open(meta_path) as f:
-                meta = json.load(f)
-            meta_color = meta.get("color", "none")
-            meta_colors = meta.get("colors")
-        except Exception:
-            pass
+    meta_color, meta_colors = _get_capture_meta(path)
 
     frame_idx = int(frame_idx)
     if arr.ndim == 3:
@@ -1561,7 +1640,11 @@ def cam_npy_preview(filename, frame_idx=0, brightness=0, contrast=100, gamma=1.0
     _pseudo_color = _PSEUDO_COLOR_MAP.get(frame_color)
     _pseudo_color_name = frame_color
     try:
-        u8 = _apply_bcg(frame, brightness, contrast, gamma, max_dim=1200)
+        dmin = float(display_min) if display_min is not None else None
+        dmax = float(display_max) if display_max is not None else None
+        u8, used_lo, used_hi = _apply_bcg(frame, brightness, contrast, gamma,
+                                          max_dim=1200, display_min=dmin,
+                                          display_max=dmax)
         quality = 90
         if _HAS_CV2:
             if u8.ndim == 3:
@@ -1590,6 +1673,8 @@ def cam_npy_preview(filename, frame_idx=0, brightness=0, contrast=100, gamma=1.0
         "frame_idx": frame_idx,
         "shape": [int(d) for d in arr.shape],
         "color": frame_color,
+        "display_min": used_lo,
+        "display_max": used_hi,
     }
     if meta_colors:
         result["colors"] = meta_colors
@@ -1702,3 +1787,317 @@ def cam_set_pseudo_color(color):
 @expose
 def cam_get_pseudo_color():
     return {"color": _pseudo_color_name}
+
+
+# ── Export (image + video) ───────────────────────────────────────────────────
+
+_EXPORTS_DIR = os.path.join(os.path.dirname(__file__), "..", "exports")
+
+
+def _ensure_exports_dir():
+    os.makedirs(_EXPORTS_DIR, exist_ok=True)
+
+
+def _render_frame_rgb(frame, color_name, brightness=0, contrast=100, gamma=1.0,
+                      display_min=None, display_max=None):
+    """Render a uint16 frame to an 8-bit RGB numpy array (H, W, 3).
+
+    Returns (rgb_array, lo, hi).
+    """
+    global _pseudo_color, _pseudo_color_name
+    prev_color, prev_name = _pseudo_color, _pseudo_color_name
+    _pseudo_color = _PSEUDO_COLOR_MAP.get(color_name)
+    _pseudo_color_name = color_name
+    try:
+        img, lo, hi = _apply_bcg(frame, brightness, contrast, gamma,
+                                 max_dim=0, display_min=display_min,
+                                 display_max=display_max)
+    finally:
+        _pseudo_color, _pseudo_color_name = prev_color, prev_name
+    if img.ndim == 2:
+        img = np.stack([img, img, img], axis=-1)
+    return img, lo, hi
+
+
+def _render_merge_rgb(arr, meta_colors, weights, gamma, ranges=None):
+    """Render a multi-channel stack (C, H, W) to merged RGB (H, W, 3).
+
+    Returns (rgb_array, computed_ranges).
+    """
+    n_ch, h, w = arr.shape
+    if weights is None:
+        weights = [1.0] * n_ch
+    computed = []
+    canvas = np.zeros((h, w, 3), dtype=np.float64)
+    for i in range(n_ch):
+        frame = arr[i].astype(np.float64)
+        if ranges and i < len(ranges) and ranges[i] is not None:
+            lo, hi = float(ranges[i][0]), float(ranges[i][1])
+        else:
+            lo = float(np.percentile(frame, 0.5))
+            hi = float(np.percentile(frame, 99.5))
+        if hi <= lo:
+            hi = lo + 1
+        computed.append([lo, hi])
+        if weights[i] <= 0:
+            continue
+        norm = np.clip((frame - lo) / (hi - lo), 0, 1)
+        c_name = (meta_colors[i] if meta_colors and i < len(meta_colors)
+                  else "none")
+        rgb = _PSEUDO_COLOR_MAP.get(c_name)
+        if rgb:
+            for ch in range(3):
+                canvas[:, :, ch] += norm * (rgb[ch] / 255.0) * weights[i]
+        else:
+            for ch in range(3):
+                canvas[:, :, ch] += norm * weights[i]
+    if gamma != 1.0:
+        canvas = np.power(np.clip(canvas, 0, 1), 1.0 / gamma)
+    else:
+        canvas = np.clip(canvas, 0, 1)
+    return (canvas * 255).astype(np.uint8), computed
+
+
+@expose
+def cam_export_image(filename, frame_idx=0, brightness=0, contrast=100,
+                     gamma=1.0, subdir=None):
+    """Export the currently viewed frame as a full-resolution PNG."""
+    base = os.path.normpath(_base_save_dir) if subdir else os.path.normpath(_save_dir)
+    if subdir:
+        base = os.path.join(base, subdir)
+    path = os.path.join(base, filename)
+    if not os.path.isfile(path):
+        return {"error": f"File not found: {filename}"}
+    try:
+        arr = tifffile.imread(path)
+    except Exception as e:
+        return {"error": f"Cannot load: {e}"}
+
+    frame_idx = int(frame_idx)
+    meta_color, meta_colors = _get_capture_meta(path)
+
+    if arr.ndim == 2:
+        frame = arr
+    elif arr.ndim == 3:
+        frame = arr[min(frame_idx, arr.shape[0] - 1)]
+    else:
+        return {"error": f"Unsupported shape: {arr.shape}"}
+
+    if meta_colors and frame_idx < len(meta_colors):
+        color = meta_colors[frame_idx]
+    else:
+        color = meta_color
+
+    rgb, _, _ = _render_frame_rgb(frame, color, brightness, contrast, gamma)
+
+    _ensure_exports_dir()
+    stem = os.path.splitext(filename)[0]
+    if arr.ndim == 3:
+        out_name = f"{stem}_f{frame_idx}.png"
+    else:
+        out_name = f"{stem}.png"
+    out_path = os.path.join(_EXPORTS_DIR, out_name)
+
+    if _HAS_CV2:
+        cv2.imwrite(out_path, cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+    elif _HAS_PIL:
+        _PILImage.fromarray(rgb, mode="RGB").save(out_path)
+    else:
+        return {"error": "No image library available (cv2 or PIL required)"}
+
+    return {"ok": True, "filename": out_name}
+
+
+@expose
+def cam_export_merge_image(filename, weights=None, gamma=1.0, subdir=None):
+    """Export the current merged stack view as a full-resolution PNG."""
+    base = os.path.normpath(_base_save_dir) if subdir else os.path.normpath(_save_dir)
+    if subdir:
+        base = os.path.join(base, subdir)
+    path = os.path.join(base, filename)
+    if not os.path.isfile(path):
+        return {"error": f"File not found: {filename}"}
+    try:
+        arr = tifffile.imread(path)
+    except Exception as e:
+        return {"error": f"Cannot load: {e}"}
+    if arr.ndim != 3 or arr.shape[0] < 2:
+        return {"error": "Need a multi-channel stack"}
+
+    _, meta_colors = _get_capture_meta(path)
+    gamma = float(gamma)
+    if weights:
+        weights = [float(x) for x in weights]
+
+    rgb, _ = _render_merge_rgb(arr, meta_colors, weights, gamma)
+
+    _ensure_exports_dir()
+    stem = os.path.splitext(filename)[0]
+    out_name = f"{stem}_merge.png"
+    out_path = os.path.join(_EXPORTS_DIR, out_name)
+
+    if _HAS_CV2:
+        cv2.imwrite(out_path, cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+    elif _HAS_PIL:
+        _PILImage.fromarray(rgb, mode="RGB").save(out_path)
+    else:
+        return {"error": "No image library available"}
+
+    return {"ok": True, "filename": out_name}
+
+
+@expose
+def cam_export_mp4(filename, fps=10, brightness=0, contrast=100, gamma=1.0,
+                   subdir=None):
+    """Export a video or timelapse .tif as an MP4 with display adjustments."""
+    if not _HAS_CV2:
+        return {"error": "OpenCV required for video export"}
+    base = os.path.normpath(_base_save_dir) if subdir else os.path.normpath(_save_dir)
+    if subdir:
+        base = os.path.join(base, subdir)
+    path = os.path.join(base, filename)
+    if not os.path.isfile(path):
+        return {"error": f"File not found: {filename}"}
+    try:
+        arr = tifffile.imread(path)
+    except Exception as e:
+        return {"error": f"Cannot load: {e}"}
+    if arr.ndim != 3 or arr.shape[0] < 2:
+        return {"error": "Need a multi-frame file (video/timelapse)"}
+
+    meta_color, _ = _get_capture_meta(path)
+    n_frames, h, w = arr.shape
+    fps = int(fps)
+
+    first_rgb, lo, hi = _render_frame_rgb(arr[0], meta_color, brightness,
+                                          contrast, gamma)
+    frame_h, frame_w = first_rgb.shape[:2]
+
+    _ensure_exports_dir()
+    stem = os.path.splitext(filename)[0]
+    out_name = f"{stem}.mp4"
+    out_path = os.path.join(_EXPORTS_DIR, out_name)
+
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(out_path, fourcc, fps, (frame_w, frame_h))
+    try:
+        writer.write(cv2.cvtColor(first_rgb, cv2.COLOR_RGB2BGR))
+        for i in range(1, n_frames):
+            rgb, _, _ = _render_frame_rgb(arr[i], meta_color, brightness,
+                                          contrast, gamma,
+                                          display_min=lo, display_max=hi)
+            writer.write(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+    finally:
+        writer.release()
+
+    return {"ok": True, "filename": out_name, "frames": n_frames}
+
+
+@expose
+def cam_export_stack_tl_mp4(filenames, channel=0, fps=2, brightness=0,
+                            contrast=100, gamma=1.0, subdir=None):
+    """Export a stack timelapse (single channel across files) as MP4."""
+    if not _HAS_CV2:
+        return {"error": "OpenCV required for video export"}
+    if not filenames or len(filenames) < 2:
+        return {"error": "Need at least 2 stack files"}
+
+    base = os.path.normpath(_base_save_dir) if subdir else os.path.normpath(_save_dir)
+    if subdir:
+        base = os.path.join(base, subdir)
+    fps = int(fps)
+    channel = int(channel)
+
+    first_path = os.path.join(base, filenames[0])
+    if not os.path.isfile(first_path):
+        return {"error": f"File not found: {filenames[0]}"}
+    first_arr = tifffile.imread(first_path)
+    if first_arr.ndim != 3:
+        return {"error": "Files must be multi-channel stacks"}
+    _, meta_colors = _get_capture_meta(first_path)
+    color = (meta_colors[channel] if meta_colors and channel < len(meta_colors)
+             else "none")
+    frame = first_arr[min(channel, first_arr.shape[0] - 1)]
+    first_rgb, lo, hi = _render_frame_rgb(frame, color, brightness,
+                                          contrast, gamma)
+    frame_h, frame_w = first_rgb.shape[:2]
+
+    _ensure_exports_dir()
+    out_name = _next_name(f"stack_tl_ch{channel}", ext=".mp4", directory=_EXPORTS_DIR)
+    out_path = os.path.join(_EXPORTS_DIR, out_name)
+
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(out_path, fourcc, fps, (frame_w, frame_h))
+    try:
+        writer.write(cv2.cvtColor(first_rgb, cv2.COLOR_RGB2BGR))
+        for fn in filenames[1:]:
+            p = os.path.join(base, fn)
+            if not os.path.isfile(p):
+                continue
+            arr = tifffile.imread(p)
+            if arr.ndim != 3:
+                continue
+            _, mc = _get_capture_meta(p)
+            c = (mc[channel] if mc and channel < len(mc) else "none")
+            f = arr[min(channel, arr.shape[0] - 1)]
+            rgb, _, _ = _render_frame_rgb(f, c, brightness, contrast, gamma,
+                                          display_min=lo, display_max=hi)
+            writer.write(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+    finally:
+        writer.release()
+
+    return {"ok": True, "filename": out_name, "frames": len(filenames)}
+
+
+@expose
+def cam_export_merge_mp4(filenames, weights=None, merge_gamma=1.0, fps=2,
+                         subdir=None):
+    """Export a merged stack timelapse as MP4."""
+    if not _HAS_CV2:
+        return {"error": "OpenCV required for video export"}
+    if not filenames or len(filenames) < 2:
+        return {"error": "Need at least 2 stack files"}
+
+    base = os.path.normpath(_base_save_dir) if subdir else os.path.normpath(_save_dir)
+    if subdir:
+        base = os.path.join(base, subdir)
+    fps = int(fps)
+    merge_gamma = float(merge_gamma)
+    if weights:
+        weights = [float(x) for x in weights]
+
+    first_path = os.path.join(base, filenames[0])
+    if not os.path.isfile(first_path):
+        return {"error": f"File not found: {filenames[0]}"}
+    first_arr = tifffile.imread(first_path)
+    if first_arr.ndim != 3:
+        return {"error": "Files must be multi-channel stacks"}
+    _, meta_colors = _get_capture_meta(first_path)
+
+    first_rgb, locked_ranges = _render_merge_rgb(first_arr, meta_colors,
+                                                 weights, merge_gamma)
+    frame_h, frame_w = first_rgb.shape[:2]
+
+    _ensure_exports_dir()
+    out_name = _next_name("stack_tl_merge", ext=".mp4", directory=_EXPORTS_DIR)
+    out_path = os.path.join(_EXPORTS_DIR, out_name)
+
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(out_path, fourcc, fps, (frame_w, frame_h))
+    try:
+        writer.write(cv2.cvtColor(first_rgb, cv2.COLOR_RGB2BGR))
+        for fn in filenames[1:]:
+            p = os.path.join(base, fn)
+            if not os.path.isfile(p):
+                continue
+            arr = tifffile.imread(p)
+            if arr.ndim != 3:
+                continue
+            _, mc = _get_capture_meta(p)
+            rgb, _ = _render_merge_rgb(arr, mc or meta_colors, weights,
+                                       merge_gamma, ranges=locked_ranges)
+            writer.write(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+    finally:
+        writer.release()
+
+    return {"ok": True, "filename": out_name, "frames": len(filenames)}

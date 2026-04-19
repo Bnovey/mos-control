@@ -5,6 +5,8 @@ __pycache__/
 captured_videos/
 captures/
 saved_experiments/
+experiments/
+exports/
 *.npy
 
 .env

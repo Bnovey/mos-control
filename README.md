@@ -1,4 +1,4 @@
-# MOS-11 Control System
+# Mosaic Control Center
 
 Web-based control system for the Nikon Eclipse Ti inverted microscope with CoolSNAP EZ camera, Nikon Intensilight epi-fluorescence illuminator, and Tecan Cavro XCalibur syringe pumps. Built as a modular alternative to Micro-Manager with real-time WebSocket streaming, preset management, and a visual acquisition timeline.
 
@@ -21,7 +21,7 @@ pip install -r requirements.txt
 python control_server.py --port 8081
 ```
 
-Open `http://localhost:8081` in your browser, or use `MOS-11.bat` from the project root for auto-launch with Edge/Chrome in app mode.
+Open `http://localhost:8081` in your browser, or use the launcher `.bat` from the project root for auto-launch with Edge/Chrome in app mode.
 
 ## Project Structure
 

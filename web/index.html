@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MOS-11 Control System</title>
+<title>Mosaic Control Center</title>
 <script>
 async function api(name, ...args) {
   const resp = await fetch('/api/' + name, {
@@ -331,7 +331,7 @@ option { background:#fff; }
 <div class="app">
 
   <header class="topbar">
-    <h1><span class="logo">&#9881;</span> MOS-11 Control</h1>
+    <h1><span class="logo">&#9881;</span> Mosaic Control Center</h1>
     <div class="topbar-right">
       <div class="status-row">
         <span class="indicator" id="indP0"><span class="dot"></span>P1</span>
@@ -831,10 +831,18 @@ option { background:#fff; }
 
             <!-- Stack timelapse row (navigate across stack files for same channel) -->
             <div class="npy-controls" id="npyStackTlControls" style="display:none">
-              <span style="font-size:11px;color:var(--text3)">Stack:</span>
+              <button id="npyStackTlPlayBtn" onclick="npyStackTlPlayToggle()"
+                      class="btn btn-sm" style="min-width:28px;padding:2px 6px;font-size:13px">&#9654;</button>
               <input type="range" id="npyStackTlSlider" min="0" max="0" value="0"
                      oninput="npyStackTlChanged()">
               <span id="npyStackTlLabel" style="font-size:11px;min-width:60px">1 / 1</span>
+              <select id="npyStackTlSpeed" onchange="npyStackTlSetSpeed()"
+                      style="font-size:11px;width:60px">
+                <option value="1">1 fps</option>
+                <option value="2" selected>2 fps</option>
+                <option value="5">5 fps</option>
+                <option value="10">10 fps</option>
+              </select>
             </div>
 
             <!-- BCG controls (all types) -->
@@ -877,6 +885,12 @@ option { background:#fff; }
               </div>
             </div>
             <div id="npyFileInfo" style="font-size:11px;color:var(--text3)"></div>
+            <!-- Export controls -->
+            <div style="display:flex;gap:6px;margin-top:4px;align-items:center">
+              <button class="btn btn-sm" id="npyExportImgBtn" style="display:none;background:#0891b2;border-color:#0891b2;color:#fff" onclick="npyExportImage()">Save PNG</button>
+              <button class="btn btn-sm" id="npyExportVidBtn" style="display:none;background:#0891b2;border-color:#0891b2;color:#fff" onclick="npyExportVideo()">Export MP4</button>
+              <span id="npyExportStatus" style="font-size:11px;color:var(--text3)"></span>
+            </div>
           </div>
         </div>
       </section>
@@ -1710,7 +1724,7 @@ function _saveStore(key, obj) { localStorage.setItem(key, JSON.stringify(obj)); 
 function msSavePreset() {
   const name = document.getElementById("msPresetName").value.trim();
   if(!name){ toast("Enter a preset name","error"); return; }
-  const obj = _loadStore("mos11_ms_presets");
+  const obj = _loadStore("mosaic_ms_presets");
   obj[name] = {
     objective: parseInt(document.getElementById("scopeNosepiece").value),
     filter: parseInt(document.getElementById("scopeFilter").value),
@@ -1720,14 +1734,14 @@ function msSavePreset() {
     ilNd: parseInt(document.getElementById("ilNdSelect").value),
     ilShutterOpen: _intensiOn
   };
-  _saveStore("mos11_ms_presets", obj);
+  _saveStore("mosaic_ms_presets", obj);
   document.getElementById("msPresetName").value = "";
   renderMsPresets();
   refreshAcqDropdowns();
   toast("Microscope preset saved","success");
 }
 async function msLoadPreset(name) {
-  const obj = _loadStore("mos11_ms_presets");
+  const obj = _loadStore("mosaic_ms_presets");
   const p = obj[name]; if(!p) return;
   if(!scopeTiConnected){ toast("Connect Ti first","error"); return; }
   const tasks = [api('ti_apply_preset', p.objective, p.filter, p.lampIntensity,
@@ -1745,7 +1759,7 @@ async function msLoadPreset(name) {
   toast("Loaded: "+name,"success");
 }
 function msEditPreset(name) {
-  const obj = _loadStore("mos11_ms_presets");
+  const obj = _loadStore("mosaic_ms_presets");
   const p = obj[name]; if(!p) return;
   document.getElementById("msPresetName").value = name;
   document.getElementById("scopeNosepiece").value = p.objective;
@@ -1759,14 +1773,14 @@ function msEditPreset(name) {
   toast("Editing: " + name, "info");
 }
 function msDeletePreset(name) {
-  const obj = _loadStore("mos11_ms_presets");
+  const obj = _loadStore("mosaic_ms_presets");
   delete obj[name];
-  _saveStore("mos11_ms_presets", obj);
+  _saveStore("mosaic_ms_presets", obj);
   renderMsPresets();
   refreshAcqDropdowns();
 }
 function renderMsPresets() {
-  const obj = _loadStore("mos11_ms_presets");
+  const obj = _loadStore("mosaic_ms_presets");
   const el = document.getElementById("msPresetList");
   const objNames = {1:'2×',2:'4×',3:'4×F',4:'10×',5:'20×',6:'40×'};
   el.innerHTML = Object.keys(obj).map(n => {
@@ -1791,21 +1805,21 @@ function acqSavePreset() {
   const binning = parseInt(document.getElementById("acqBinning").value) || 1;
   if(!name){ toast("Enter a name","error"); return; }
   if(!ms){ toast("Select a scope preset","error"); return; }
-  const obj = _loadStore("mos11_acq_presets");
+  const obj = _loadStore("mosaic_acq_presets");
   obj[name] = { microscopePreset: ms, exposure_ms: exposure, binning: binning };
-  _saveStore("mos11_acq_presets", obj);
+  _saveStore("mosaic_acq_presets", obj);
   document.getElementById("acqPresetName").value = "";
   renderAcqPresets();
   toast("Acquisition preset saved","success");
 }
 function acqDeletePreset(name) {
-  const obj = _loadStore("mos11_acq_presets");
+  const obj = _loadStore("mosaic_acq_presets");
   delete obj[name];
-  _saveStore("mos11_acq_presets", obj);
+  _saveStore("mosaic_acq_presets", obj);
   renderAcqPresets();
 }
 function acqEditPreset(name) {
-  const obj = _loadStore("mos11_acq_presets");
+  const obj = _loadStore("mosaic_acq_presets");
   const p = obj[name]; if(!p) return;
   document.getElementById("acqPresetName").value = name;
   document.getElementById("acqMsPreset").value = p.microscopePreset || '';
@@ -1820,7 +1834,7 @@ const _ACQ_COLOR_HEX = {
 const _FILTER_CUBE_COLOR = {1:'none', 2:'blue', 3:'green', 4:'red'};
 const _FILTER_CUBE_NAME  = {1:'DIA', 2:'DAPI', 3:'GFP', 4:'TxRed'};
 function acqResolveColor(msPresetName) {
-  const msObj = _loadStore("mos11_ms_presets");
+  const msObj = _loadStore("mosaic_ms_presets");
   const m = msObj[msPresetName];
   return m ? (_FILTER_CUBE_COLOR[m.filter] || 'none') : 'none';
 }
@@ -1830,13 +1844,13 @@ function acqUpdateSwatch() {
   const color = acqResolveColor(msName);
   if(swatch) {
     swatch.style.background = _ACQ_COLOR_HEX[color] || '#888';
-    const msObj = _loadStore("mos11_ms_presets");
+    const msObj = _loadStore("mosaic_ms_presets");
     const m = msObj[msName];
     swatch.title = m ? (_FILTER_CUBE_NAME[m.filter] || 'DIA') : '';
   }
 }
 async function acqLoadPreset(name) {
-  const obj = _loadStore("mos11_acq_presets");
+  const obj = _loadStore("mosaic_acq_presets");
   const p = obj[name]; if(!p) return;
   document.getElementById("acqPresetName").value = name;
   document.getElementById("acqExposure").value = p.exposure_ms || 50;
@@ -1853,8 +1867,8 @@ async function acqLoadPreset(name) {
   toast("Loaded: "+name,"success");
 }
 function renderAcqPresets() {
-  const obj = _loadStore("mos11_acq_presets");
-  const msObj = _loadStore("mos11_ms_presets");
+  const obj = _loadStore("mosaic_acq_presets");
+  const msObj = _loadStore("mosaic_ms_presets");
   const el = document.getElementById("acqPresetList");
   el.innerHTML = Object.keys(obj).map(n => {
     const p = obj[n];
@@ -1872,7 +1886,7 @@ function renderAcqPresets() {
   }).join("") || '<span style="font-size:11px;color:var(--text3)">No acquisition presets</span>';
 }
 function refreshAcqDropdowns() {
-  const msObj = _loadStore("mos11_ms_presets");
+  const msObj = _loadStore("mosaic_ms_presets");
   const msSel = document.getElementById("acqMsPreset");
   msSel.innerHTML = '<option value="">Scope preset...</option>' +
     Object.keys(msObj).map(n=>`<option value="${n}">${n}</option>`).join("");
@@ -1887,8 +1901,8 @@ function expGatherState() {
   const repEl = document.getElementById("tlRepeat");
   const forEl = document.getElementById("tlForever");
   return {
-    microscopePresets:  _loadStore("mos11_ms_presets"),
-    acquisitionPresets: _loadStore("mos11_acq_presets"),
+    microscopePresets:  _loadStore("mosaic_ms_presets"),
+    acquisitionPresets: _loadStore("mosaic_acq_presets"),
     timeline: {
       events: tlEvents,
       lanes:  tlLanes,
@@ -1902,12 +1916,12 @@ function expGatherState() {
 
 function expRestoreState(data) {
   if(data.microscopePresets) {
-    _saveStore("mos11_ms_presets", data.microscopePresets);
+    _saveStore("mosaic_ms_presets", data.microscopePresets);
     renderMsPresets();
     refreshAcqDropdowns();
   }
   if(data.acquisitionPresets) {
-    _saveStore("mos11_acq_presets", data.acquisitionPresets);
+    _saveStore("mosaic_acq_presets", data.acquisitionPresets);
     renderAcqPresets();
     refreshAcqDropdowns();
   }
@@ -1971,8 +1985,8 @@ async function expRefreshList() {
 /* ═══════════════════════════════════════════════════════════════════════════
    TIMELINE  –  Number-line with lanes
    ═══════════════════════════════════════════════════════════════════════════ */
-let tlEvents = JSON.parse(localStorage.getItem("mos11_tl_events")||"[]").filter(e => e.type !== 'pump');
-let tlLanes  = (JSON.parse(localStorage.getItem("mos11_tl_lanes")||'null')
+let tlEvents = JSON.parse(localStorage.getItem("mosaic_tl_events")||"[]").filter(e => e.type !== 'pump');
+let tlLanes  = (JSON.parse(localStorage.getItem("mosaic_tl_lanes")||'null')
                || [{id:"imaging", label:"Imaging", type:"imaging"}])
                .filter(l => l.type !== 'pump');
 let tlSelectedId = null;
@@ -1990,10 +2004,10 @@ const TL_LABELS = {
 };
 
 function tlSaveEvents() {
-  localStorage.setItem("mos11_tl_events", JSON.stringify(tlEvents));
+  localStorage.setItem("mosaic_tl_events", JSON.stringify(tlEvents));
 }
 function tlSaveLanes() {
-  localStorage.setItem("mos11_tl_lanes", JSON.stringify(tlLanes));
+  localStorage.setItem("mosaic_tl_lanes", JSON.stringify(tlLanes));
 }
 function tlPxPerSec() {
   const slider = parseFloat(document.getElementById("tlZoom").value) || 30;
@@ -2449,7 +2463,7 @@ function _tlStartDrag(e, ev, mode, lane, pps) {
 
 /* ── Editor panel ── */
 function tlRefreshEditorDropdowns() {
-  const acqObj = _loadStore("mos11_acq_presets");
+  const acqObj = _loadStore("mosaic_acq_presets");
   const acqSel = document.getElementById("tlEdAcqPreset");
   acqSel.innerHTML = '<option value="">None</option>' +
     Object.keys(acqObj).map(n=>`<option value="${n}">${n}</option>`).join("");
@@ -2673,7 +2687,7 @@ function tlOpenEditor(ev) {
     }
 
     if(ev.type === 'video') {
-      const acqObj = _loadStore("mos11_acq_presets");
+      const acqObj = _loadStore("mosaic_acq_presets");
       const a = acqObj[ev.acqPreset] || {};
       const expMs = a.exposure_ms || null;
       const maxFps = expMs ? Math.floor(1000 / expMs) : 120;
@@ -2687,8 +2701,8 @@ function tlOpenEditor(ev) {
       </div>
       <div id="tlFpsWarn" style="font-size:10px;color:var(--red);margin-top:2px;${fpsWarn ? '' : 'display:none'}">${fpsWarn ? `⚠ ${curFps} fps requires <${Math.ceil(1000/curFps)}ms exposure — preset is ${expMs}ms` : ''}</div>`;
     } else if(ev.type === 'stack') {
-      const acqObj = _loadStore("mos11_acq_presets");
-      const msObj  = _loadStore("mos11_ms_presets");
+      const acqObj = _loadStore("mosaic_acq_presets");
+      const msObj  = _loadStore("mosaic_ms_presets");
       const acqNames = Object.keys(acqObj);
       const selPresets = ev.stackPresets || [];
       let rows = selPresets.map((p, i) => {
@@ -2744,7 +2758,7 @@ function tlOpenEditor(ev) {
 function tlStackCalcDuration(ev) {
   const presets = ev.stackPresets || [];
   if(!presets.length) return 2;
-  const acqObj = _loadStore("mos11_acq_presets");
+  const acqObj = _loadStore("mosaic_acq_presets");
   let total = 0;
   for(const pn of presets) {
     const a = acqObj[pn] || {};
@@ -2878,7 +2892,7 @@ function tlEditorChanged() {
     const syr = parseFloat(document.getElementById("cavroSyringe")?.value) || 0.5;
     const countsPerMl = 3000 / syr;
     const maxMlS = 2900 / countsPerMl;
-    const minMlS = 1 / countsPerMl;
+    const minMlS = 2.5 / countsPerMl;
     const estEl = document.getElementById("tlEdCavroEst");
     // Convert user velocity to mL/s for backend
     let velMlS = null;
@@ -2933,7 +2947,7 @@ function tlEditorChanged() {
     if(intv) ev.interval = parseInt(intv.value) || 1000;
 
     if(ev.type === 'video' && fps) {
-      const acqObj = _loadStore("mos11_acq_presets");
+      const acqObj = _loadStore("mosaic_acq_presets");
       const a = acqObj[ev.acqPreset] || {};
       const expMs = a.exposure_ms || null;
       const maxFps = expMs ? Math.floor(1000 / expMs) : 120;
@@ -2976,7 +2990,7 @@ document.addEventListener("click", e => {
 
 /* ── Execution engine ── */
 async function tlApplyMsPreset(presetName) {
-  const ms = _loadStore("mos11_ms_presets");
+  const ms = _loadStore("mosaic_ms_presets");
   const p = ms[presetName];
   if(!p || !scopeTiConnected) return;
   const tasks = [api('ti_apply_preset', p.objective, p.filter,
@@ -2994,7 +3008,7 @@ async function tlApplyMsPreset(presetName) {
 }
 
 async function tlApplyAcqPreset(presetName) {
-  const acq = _loadStore("mos11_acq_presets");
+  const acq = _loadStore("mosaic_acq_presets");
   const a = acq[presetName]; if(!a) return;
   const tasks = [tlApplyMsPreset(a.microscopePreset)];
   if(scopeCamConnected) {
@@ -3057,7 +3071,6 @@ async function tlRunCycle(sorted, progress) {
   // Wait for remaining cycle time
   if(timeLeft() > 100 && !tlAbort) await tlSleep(timeLeft());
 
-  // Hard stop: kill all running hardware, don't wait for graceful finish
   await tlStopAllHardware(sorted);
 
   function launchEvent(ev, maxMs, progress) {
@@ -3093,13 +3106,14 @@ async function tlRunCycle(sorted, progress) {
             const recDur = ev._recordDur || ev.duration;
             progress.textContent = `${ev.name}: recording ${recDur}s @ ${fps}fps...`;
             await api('cam_record_video', null, recDur, fps);
+            await tlSleep(recDur * 1000 + 2000);
           } else if(ev.type === 'stack') {
             await api('cam_experiment_set_subdir', 'stack');
             const presetNames = ev.stackPresets && ev.stackPresets.length ? ev.stackPresets : [];
             if(presetNames.length) {
               progress.textContent = `${ev.name}: capturing ${presetNames.length} channels...`;
-              const acqStore = _loadStore("mos11_acq_presets");
-              const msStore  = _loadStore("mos11_ms_presets");
+              const acqStore = _loadStore("mosaic_acq_presets");
+              const msStore  = _loadStore("mosaic_ms_presets");
               const channels = presetNames.map(pn => {
                 const a = acqStore[pn]; if(!a) return null;
                 const m = msStore[a.microscopePreset] || {};
@@ -3122,7 +3136,13 @@ async function tlRunCycle(sorted, progress) {
             const intervalSec = (ev.interval || 1000) / 1000;
             progress.textContent = `${ev.name}: timelapse ${frames} frames`;
             await api('cam_record_timelapse', frames, intervalSec);
+            await tlSleep(frames * intervalSec * 1000 + 2000);
           }
+          // Turn off illumination after capture
+          const off = [];
+          if(scopeTiConnected) { off.push(api('ti_shutter_close').catch(()=>{})); off.push(api('ti_dia_lamp_off').catch(()=>{})); }
+          if(_ilConnected) off.push(api('il_shutter_close').catch(()=>{}));
+          if(off.length) await Promise.all(off);
         }
       } catch(err) {
         logMsg(`Event "${ev.name}" error: ${err}`, "error");
@@ -3130,6 +3150,18 @@ async function tlRunCycle(sorted, progress) {
     };
     run();
   }
+}
+
+async function tlStopCaptures(sorted) {
+  const stops = [];
+  let hasCam = false;
+  for(const ev of sorted) {
+    if((ev.type === 'video' || ev.type === 'timelapse') && !hasCam) {
+      hasCam = true;
+      stops.push(api('cam_capture_stop').catch(()=>{}));
+    }
+  }
+  if(stops.length) await Promise.all(stops);
 }
 
 async function tlStopAllHardware(sorted) {
@@ -3179,7 +3211,7 @@ async function tlPlay() {
   }
   if(expRes.error){ toast("Experiment folder: "+expRes.error,"error"); return; }
   logMsg("Experiment folder: "+expRes.path, "exp");
-  api('experiment_save', expName, expGatherState()).catch(()=>{});
+  api('cam_experiment_set_payload', expGatherState()).catch(()=>{});
   tlRunning = true; tlAbort = false;
   document.getElementById("tlPlayBtn").disabled = true;
   document.getElementById("tlStopBtn").disabled = false;
@@ -3226,7 +3258,6 @@ async function tlPlay() {
   progress.textContent = tlAbort
     ? `Stopped after ${cycle} cycles (${tlFormatDuration(Math.round(totalElapsed))})`
     : `Complete: ${cycle} cycles (${tlFormatDuration(Math.round(totalElapsed))})`;
-  await api('cam_experiment_end');
   if(!tlAbort) toast("Timeline complete","success");
   logMsg("Timeline " + (tlAbort ? "stopped" : "complete") + ` after ${cycle} cycles`, "exp");
   tlRender();
@@ -3247,7 +3278,7 @@ refreshAcqDropdowns();
 tlRender();
 tlUpdateTotalTime();
 expRefreshList();
-logMsg("MOS-11 Control System ready","sys");
+logMsg("Mosaic Control Center ready","sys");
 
 /* ═══════════════════════════════════════════════════════════════════════════
    NPY VIEWER
@@ -3371,6 +3402,7 @@ let _npyPlayFps = 10;
 
 function npySelectFile(filename, subdir) {
   npyPlayStop();
+  npyStackTlStop();
   _npyCurrentFile = filename;
   _npySubdir = subdir;
   _npyShowingStack = false;
@@ -3396,6 +3428,11 @@ function npySelectFile(filename, subdir) {
   document.getElementById("npyMergeBtn").style.display = ft === 'stack' ? '' : 'none';
   document.getElementById("npyMergeBtn").textContent = 'Merge Channels';
   document.getElementById("npyMergeBtn").style.background = '#8b5cf6';
+
+  document.getElementById("npyExportImgBtn").style.display = '';
+  document.getElementById("npyExportVidBtn").style.display =
+    (ft === 'video' || ft === 'timelapse') ? '' : 'none';
+  document.getElementById("npyExportStatus").textContent = '';
 
   if(ft === 'stack') {
     npyLoadStackFile(filename, subdir);
@@ -3459,10 +3496,13 @@ function npyReloadCurrent() {
 }
 
 /* ── Frame loading (video / timelapse / single channel view) ── */
-async function npyLoadFrame(filename, frameIdx) {
+async function npyLoadFrame(filename, frameIdx, dispMin, dispMax) {
   const bcg = _npyBcgValues();
+  const dMin = dispMin !== undefined ? dispMin : null;
+  const dMax = dispMax !== undefined ? dispMax : null;
   const r = await api('cam_npy_preview', filename, frameIdx,
-                       bcg.brightness, bcg.contrast, bcg.gamma, _npySubdir);
+                       bcg.brightness, bcg.contrast, bcg.gamma, _npySubdir,
+                       dMin, dMax);
   if(r.error) { document.getElementById("npyFileInfo").textContent = r.error; return; }
   const img = document.getElementById("npyImage");
   img.src = "data:image/jpeg;base64," + r.image;
@@ -3495,6 +3535,7 @@ async function npyLoadFrame(filename, frameIdx) {
       document.getElementById("npyFrameLabel").textContent = `${r.frame_idx + 1} / ${r.n_frames}`;
     }
   }
+  return r;
 }
 
 /* ── Play/pause for video + timelapse ── */
@@ -3505,6 +3546,7 @@ async function npyPlayToggle() {
   _npyPlaying = true;
   document.getElementById("npyPlayBtn").innerHTML = '&#9646;&#9646;';
   const slider = document.getElementById("npyFrameSlider");
+  let lockedMin = undefined, lockedMax = undefined;
   while(_npyPlaying) {
     const t0 = performance.now();
     let idx = parseInt(slider.value) + 1;
@@ -3512,7 +3554,13 @@ async function npyPlayToggle() {
     slider.value = idx;
     document.getElementById("npyFrameLabel").textContent =
       `${idx + 1} / ${parseInt(slider.max) + 1}`;
-    if(_npyCurrentFile) await npyLoadFrame(_npyCurrentFile, idx);
+    if(_npyCurrentFile) {
+      const r = await npyLoadFrame(_npyCurrentFile, idx, lockedMin, lockedMax);
+      if(r && lockedMin === undefined) {
+        lockedMin = r.display_min;
+        lockedMax = r.display_max;
+      }
+    }
     if(!_npyPlaying) break;
     const elapsed = performance.now() - t0;
     const wait = Math.max(0, (1000 / _npyPlayFps) - elapsed);
@@ -3582,6 +3630,7 @@ async function npyLoadStackFile(filename, subdir) {
     if(slider.value < 0) slider.value = 0;
     document.getElementById("npyStackTlLabel").textContent =
       `${parseInt(slider.value)+1} / ${_npyStackFiles.length}`;
+    document.getElementById("npyExportVidBtn").style.display = '';
   } else {
     tlRow.style.display = 'none';
   }
@@ -3618,6 +3667,56 @@ function npyStackTlChanged() {
   }
 }
 
+/* ── Stack timelapse playback ── */
+let _npyStackTlPlaying = false;
+let _npyStackTlFps = 2;
+
+async function npyStackTlPlayToggle() {
+  if(_npyStackTlPlaying) { npyStackTlStop(); return; }
+  if(_npyStackFiles.length < 2) return;
+  _npyStackTlPlaying = true;
+  document.getElementById("npyStackTlPlayBtn").innerHTML = '&#9646;&#9646;';
+  const slider = document.getElementById("npyStackTlSlider");
+  let lockedMin = undefined, lockedMax = undefined;
+  let lockedRanges = undefined;
+  while(_npyStackTlPlaying) {
+    const t0 = performance.now();
+    let idx = parseInt(slider.value) + 1;
+    if(idx > parseInt(slider.max)) idx = 0;
+    slider.value = idx;
+    document.getElementById("npyStackTlLabel").textContent =
+      `${idx+1} / ${_npyStackFiles.length}`;
+    _npyCurrentFile = _npyStackFiles[idx];
+    if(_npyShowingMerge) {
+      const r = await _npyDoMerge(lockedRanges);
+      if(r && lockedRanges === undefined) {
+        lockedRanges = r.ranges;
+      }
+    } else {
+      const ch = parseInt(document.getElementById("npyChannelSelect").value) || 0;
+      const r = await npyLoadFrame(_npyCurrentFile, ch, lockedMin, lockedMax);
+      if(r && lockedMin === undefined) {
+        lockedMin = r.display_min;
+        lockedMax = r.display_max;
+      }
+    }
+    if(!_npyStackTlPlaying) break;
+    const elapsed = performance.now() - t0;
+    const wait = Math.max(0, (1000 / _npyStackTlFps) - elapsed);
+    if(wait > 0) await new Promise(r => setTimeout(r, wait));
+  }
+}
+
+function npyStackTlStop() {
+  _npyStackTlPlaying = false;
+  const btn = document.getElementById("npyStackTlPlayBtn");
+  if(btn) btn.innerHTML = '&#9654;';
+}
+
+function npyStackTlSetSpeed() {
+  _npyStackTlFps = parseInt(document.getElementById("npyStackTlSpeed").value) || 2;
+}
+
 /* ── Timelapse: stack all frames ── */
 let _npyShowingStack = false;
 async function npyStackFrames() {
@@ -3649,6 +3748,7 @@ const _COLOR_TO_CUBE_M = {none:'DIA', blue:'DAPI', green:'GFP', red:'TxRed'};
 
 async function npyMergeChannels() {
   if(!_npyCurrentFile) return;
+  npyStackTlStop();
   if(_npyShowingMerge) {
     _npyShowingMerge = false;
     document.getElementById("npyMergeBtn").textContent = "Merge Channels";
@@ -3707,10 +3807,11 @@ function npyMergeChanged() {
   _npyMergeDebounce = setTimeout(() => _npyDoMerge(), 100);
 }
 
-async function _npyDoMerge() {
+async function _npyDoMerge(lockedRanges) {
   if(!_npyCurrentFile || !_npyShowingMerge) return;
   const gamma = parseInt(document.getElementById("npyMergeGamma").value) / 100.0;
-  const r = await api('cam_npy_merge', _npyCurrentFile, _npyMergeWeights, gamma, _npySubdir);
+  const rng = lockedRanges !== undefined ? lockedRanges : null;
+  const r = await api('cam_npy_merge', _npyCurrentFile, _npyMergeWeights, gamma, _npySubdir, rng);
   if(r.error) { toast(r.error, "error"); return; }
   const img = document.getElementById("npyImage");
   img.src = "data:image/jpeg;base64," + r.image;
@@ -3719,6 +3820,84 @@ async function _npyDoMerge() {
   const labels = (r.colors || []).map(c => _COLOR_TO_CUBE_M[c] || c).join(' + ');
   document.getElementById("npyFileInfo").textContent =
     `${_npyCurrentFile} — Merge: ${labels}, ${r.width}×${r.height} px`;
+  return r;
+}
+
+/* ── Export (save image / export MP4) ── */
+
+function _npyTriggerDownload(filename) {
+  const a = document.createElement('a');
+  a.href = `/api/export/download/${encodeURIComponent(filename)}`;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+async function npyExportImage() {
+  if(!_npyCurrentFile) return;
+  const status = document.getElementById("npyExportStatus");
+  status.textContent = 'Exporting PNG...';
+
+  const ft = _npyFileTypeCache;
+  let r;
+  if(_npyShowingMerge) {
+    const gamma = parseInt(document.getElementById("npyMergeGamma").value) / 100.0;
+    r = await api('cam_export_merge_image', _npyCurrentFile, _npyMergeWeights,
+                   gamma, _npySubdir);
+  } else {
+    const bcg = _npyBcgValues();
+    let frameIdx = 0;
+    if(ft === 'stack') {
+      frameIdx = parseInt(document.getElementById("npyChannelSelect").value) || 0;
+    } else if(ft === 'video' || ft === 'timelapse') {
+      frameIdx = parseInt(document.getElementById("npyFrameSlider").value) || 0;
+    }
+    r = await api('cam_export_image', _npyCurrentFile, frameIdx,
+                   bcg.brightness, bcg.contrast, bcg.gamma, _npySubdir);
+  }
+
+  if(r.error) { status.textContent = r.error; return; }
+  status.textContent = `Saved: ${r.filename}`;
+  _npyTriggerDownload(r.filename);
+}
+
+async function npyExportVideo() {
+  if(!_npyCurrentFile) return;
+  const status = document.getElementById("npyExportStatus");
+  const ft = _npyFileTypeCache;
+
+  if(ft === 'video' || ft === 'timelapse') {
+    const bcg = _npyBcgValues();
+    const fps = parseInt(document.getElementById("npyPlaySpeed").value) || 10;
+    status.textContent = 'Rendering MP4... (this may take a moment)';
+    const r = await api('cam_export_mp4', _npyCurrentFile, fps,
+                         bcg.brightness, bcg.contrast, bcg.gamma, _npySubdir);
+    if(r.error) { status.textContent = r.error; return; }
+    status.textContent = `Exported ${r.frames} frames: ${r.filename}`;
+    _npyTriggerDownload(r.filename);
+    return;
+  }
+
+  if(ft === 'stack' && _npyStackFiles.length > 1) {
+    const fps = parseInt(document.getElementById("npyStackTlSpeed").value) || 2;
+    status.textContent = 'Rendering MP4... (this may take a moment)';
+    let r;
+    if(_npyShowingMerge) {
+      const gamma = parseInt(document.getElementById("npyMergeGamma").value) / 100.0;
+      r = await api('cam_export_merge_mp4', _npyStackFiles, _npyMergeWeights,
+                     gamma, fps, _npySubdir);
+    } else {
+      const ch = parseInt(document.getElementById("npyChannelSelect").value) || 0;
+      const bcg = _npyBcgValues();
+      r = await api('cam_export_stack_tl_mp4', _npyStackFiles, ch, fps,
+                     bcg.brightness, bcg.contrast, bcg.gamma, _npySubdir);
+    }
+    if(r.error) { status.textContent = r.error; return; }
+    status.textContent = `Exported ${r.frames} frames: ${r.filename}`;
+    _npyTriggerDownload(r.filename);
+    return;
+  }
 }
 
 onEvent("onCamCaptureComplete", function(filename) {
