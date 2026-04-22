@@ -334,14 +334,14 @@ option { background:#fff; }
     <h1><span class="logo">&#9881;</span> Mosaic Control Center</h1>
     <div class="topbar-right">
       <div class="status-row">
-        <span class="indicator" id="indP0"><span class="dot"></span>P1</span>
-        <span class="indicator" id="indP1"><span class="dot"></span>P2</span>
-        <span class="indicator" id="indP2"><span class="dot"></span>P3</span>
-        <span class="indicator" id="indP3"><span class="dot"></span>P4</span>
-        <span class="indicator" id="indC0"><span class="dot"></span>C1</span>
-        <span class="indicator" id="indC1"><span class="dot"></span>C2</span>
-        <span class="indicator" id="indC2"><span class="dot"></span>C3</span>
-        <span class="indicator" id="indC3"><span class="dot"></span>C4</span>
+        <span class="indicator" id="indP0"><span class="dot"></span>P0</span>
+        <span class="indicator" id="indP1"><span class="dot"></span>P1</span>
+        <span class="indicator" id="indP2"><span class="dot"></span>P2</span>
+        <span class="indicator" id="indP3"><span class="dot"></span>P3</span>
+        <span class="indicator" id="indC0"><span class="dot"></span>C0</span>
+        <span class="indicator" id="indC1"><span class="dot"></span>C1</span>
+        <span class="indicator" id="indC2"><span class="dot"></span>C2</span>
+        <span class="indicator" id="indC3"><span class="dot"></span>C3</span>
         <span class="indicator" id="indScope"><span class="dot"></span>SCOPE</span>
         <span class="indicator" id="indIL"><span class="dot"></span>IL</span>
         <span class="indicator" id="indCam"><span class="dot"></span>CAM</span>
@@ -387,7 +387,7 @@ option { background:#fff; }
               <input type="number" id="cavroValves" value="6" min="2" max="9" style="width:50px"></div>
             <div class="field"><label>Addresses</label>
               <input type="text" id="cavroAddresses" value="0,1,2,3" style="width:100px"
-                     title="Comma-separated RS-485 addresses for C1–C4"></div>
+                     title="Comma-separated RS-485 addresses for C0–C3"></div>
             <div class="btn-row">
               <button class="btn green btn-sm" id="cavroBusConn" onclick="cavroConnectBus()">Connect Bus</button>
               <button class="btn red btn-sm" id="cavroBusDisc" onclick="cavroDisconnectBus()" disabled>Disconnect</button>
@@ -398,19 +398,19 @@ option { background:#fff; }
           <div class="section">
             <div class="section-label">Individual Home</div>
             <div class="btn-row">
-              <button class="btn blue btn-sm" onclick="cavroHome(0)">Home C1</button>
-              <button class="btn blue btn-sm" onclick="cavroHome(1)">Home C2</button>
-              <button class="btn blue btn-sm" onclick="cavroHome(2)">Home C3</button>
-              <button class="btn blue btn-sm" onclick="cavroHome(3)">Home C4</button>
+              <button class="btn blue btn-sm" onclick="cavroHome(0)">Home C0</button>
+              <button class="btn blue btn-sm" onclick="cavroHome(1)">Home C1</button>
+              <button class="btn blue btn-sm" onclick="cavroHome(2)">Home C2</button>
+              <button class="btn blue btn-sm" onclick="cavroHome(3)">Home C3</button>
             </div>
           </div>
           <div class="section">
             <div class="section-label">Status</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px">
-              <div>C1: <span id="cStatus0">—</span></div>
-              <div>C2: <span id="cStatus1">—</span></div>
-              <div>C3: <span id="cStatus2">—</span></div>
-              <div>C4: <span id="cStatus3">—</span></div>
+              <div>C0: <span id="cStatus0">—</span></div>
+              <div>C1: <span id="cStatus1">—</span></div>
+              <div>C2: <span id="cStatus2">—</span></div>
+              <div>C3: <span id="cStatus3">—</span></div>
             </div>
             <div class="btn-row" style="margin-top:6px">
               <button class="btn btn-sm" onclick="cavroRefreshAllStatus()">Refresh All</button>
@@ -719,8 +719,8 @@ option { background:#fff; }
             <div class="sep"></div>
             <!-- <button class="btn btn-sm" onclick="tlAddPumpLane()">+ Pump Lane</button> -->
             <select id="tlCavroLanePick" style="min-width:70px;font-size:11px">
-              <option value="0">Cavro 1</option><option value="1">Cavro 2</option>
-              <option value="2">Cavro 3</option><option value="3">Cavro 4</option>
+              <option value="0">Cavro 0</option><option value="1">Cavro 1</option>
+              <option value="2">Cavro 2</option><option value="3">Cavro 3</option>
             </select>
             <button class="btn btn-sm" onclick="tlAddCavroLane()">+ Cavro Lane</button>
             <div class="sep"></div>
@@ -1169,7 +1169,7 @@ function pumpCardHTML(i) {
   const units = RATE_UNITS.map(u=>`<option>${u}</option>`).join("");
   return `
   <div class="card" id="pump${i}">
-    <div class="card-head"><span class="title">Pump ${i+1}</span>
+    <div class="card-head"><span class="title">Pump ${i}</span>
       <span class="badge" id="pBadge${i}">Offline</span></div>
     <div class="section">
       <div class="section-label">Connection</div>
@@ -1245,7 +1245,7 @@ async function pumpConnect(i) {
   const addr = document.getElementById("addr"+i).value;
   if(!port){ toast("Select a port","error"); return; }
   const res = await api('pump_connect', i, port, parseInt(addr));
-  if(res.error){ toast("P"+(i+1)+": "+res.error,"error"); return; }
+  if(res.error){ toast("P"+i+": "+res.error,"error"); return; }
   pumpState[i].connected = true;
   document.getElementById("pump"+i).classList.add("connected");
   document.getElementById("pBadge"+i).className="badge on";
@@ -1253,8 +1253,8 @@ async function pumpConnect(i) {
   document.getElementById("pConn"+i).disabled=true;
   document.getElementById("pDisc"+i).disabled=false;
   updateIndicators();
-  toast("P"+(i+1)+" connected","success");
-  logMsg("P"+(i+1)+" connected on "+port,"pump");
+  toast("P"+i+" connected","success");
+  logMsg("P"+i+" connected on "+port,"pump");
 }
 async function pumpDisconnect(i) {
   await api('pump_disconnect', i);
@@ -1265,42 +1265,42 @@ async function pumpDisconnect(i) {
   document.getElementById("pConn"+i).disabled=false;
   document.getElementById("pDisc"+i).disabled=true;
   updateIndicators();
-  toast("P"+(i+1)+" disconnected");
+  toast("P"+i+" disconnected");
 }
 async function pumpSetDia(i) {
   const v=document.getElementById("dia"+i).value;
   const r=await api('pump_set_diameter', i, parseFloat(v));
-  if(r.error) toast("P"+(i+1)+": "+r.error,"error");
-  else toast("P"+(i+1)+": diameter set","success");
+  if(r.error) toast("P"+i+": "+r.error,"error");
+  else toast("P"+i+": diameter set","success");
 }
 async function pumpSetDir(i) {
   const v=document.getElementById("dir"+i).value;
   const r=await api('pump_set_direction', i, v);
-  if(r.error) toast("P"+(i+1)+": "+r.error,"error");
-  else toast("P"+(i+1)+": direction="+v,"success");
+  if(r.error) toast("P"+i+": "+r.error,"error");
+  else toast("P"+i+": direction="+v,"success");
 }
 async function pumpSetRate(i) {
   const rate=document.getElementById("rate"+i).value;
   const u=document.getElementById("rateU"+i).value;
   const r=await api('pump_set_rate', i, parseFloat(rate), u);
-  if(r.error) toast("P"+(i+1)+": "+r.error,"error");
-  else toast("P"+(i+1)+": rate set","success");
+  if(r.error) toast("P"+i+": "+r.error,"error");
+  else toast("P"+i+": rate set","success");
 }
 async function pumpSetVol(i) {
   const v=document.getElementById("vol"+i).value;
   const r=await api('pump_set_volume', i, parseFloat(v));
-  if(r.error) toast("P"+(i+1)+": "+r.error,"error");
-  else toast("P"+(i+1)+": volume set","success");
+  if(r.error) toast("P"+i+": "+r.error,"error");
+  else toast("P"+i+": volume set","success");
 }
 async function pumpRun(i) {
   const r=await api('pump_run', i);
-  if(r.error) toast("P"+(i+1)+": "+r.error,"error");
-  else toast("P"+(i+1)+": running","success");
+  if(r.error) toast("P"+i+": "+r.error,"error");
+  else toast("P"+i+": running","success");
 }
 async function pumpStop(i) {
   const r=await api('pump_stop', i);
-  if(r.error) toast("P"+(i+1)+": "+r.error,"error");
-  else toast("P"+(i+1)+": stopped");
+  if(r.error) toast("P"+i+": "+r.error,"error");
+  else toast("P"+i+": stopped");
 }
 async function pumpClrVol(i) { await api('pump_clear_volume', i); }
 async function pumpClrTgt(i) { await api('pump_clear_target', i); }
@@ -1341,7 +1341,7 @@ async function protoRun(i) {
   if(!pumpState[i].connected){ toast("Connect pump first","error"); return; }
   if(!pumpState[i].steps.length){ toast("Protocol empty","error"); return; }
   const r=await api('pump_run_protocol', i, pumpState[i].steps);
-  if(r.error){ toast("P"+(i+1)+": "+r.error,"error"); return; }
+  if(r.error){ toast("P"+i+": "+r.error,"error"); return; }
   pumpState[i].protoRunning=true;
   document.getElementById("protoRun"+i).disabled=true;
   document.getElementById("protoStop"+i).disabled=false;
@@ -1415,10 +1415,10 @@ async function cavroStopAll() {
 /* ── Homing ───────────────────────────────────────────────────────────────── */
 async function cavroHome(i) {
   if(!cavroBusConnected){ toast("Connect bus first","error"); return; }
-  toast("Homing Cavro "+(i+1)+"...");
+  toast("Homing Cavro "+i+"...");
   const r = await api('cavro_home', i);
-  if(r.error) toast("C"+(i+1)+": "+r.error,"error");
-  else { toast("C"+(i+1)+" homed","success"); cavroRefreshAllStatus(); }
+  if(r.error) toast("C"+i+": "+r.error,"error");
+  else { toast("C"+i+" homed","success"); cavroRefreshAllStatus(); }
 }
 
 async function cavroHomeAll() {
@@ -1445,7 +1445,7 @@ async function cavroRefreshAllStatus() {
 
 /* ── Cavro event handlers (for timeline-triggered operations) ─────────────── */
 onEvent("onCavroContinuousUpdate", function(idx, status, msg) {
-  logMsg("C"+(idx+1)+": "+msg, "sys");
+  logMsg("C"+idx+": "+msg, "sys");
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2303,7 +2303,7 @@ function tlAddPumpLane() {
   const pumpLanes = tlLanes.filter(l => l.type === 'pump');
   const nextIdx = pumpLanes.length;
   if(nextIdx >= 4){ toast("Max 4 pump lanes","error"); return; }
-  const lane = { id: 'pump'+nextIdx, label:'Pump '+(nextIdx+1), type:'pump', pumpIdx: nextIdx };
+  const lane = { id: 'pump'+nextIdx, label:'Pump '+nextIdx, type:'pump', pumpIdx: nextIdx };
   tlLanes.push(lane); tlSaveLanes(); tlRender();
 }
 -- end pump lane feature */
@@ -2311,9 +2311,9 @@ function tlAddPumpLane() {
 function tlAddCavroLane() {
   const pick = parseInt(document.getElementById("tlCavroLanePick").value);
   const used = new Set(tlLanes.filter(l => l.type === 'cavro').map(l => l.cavroIdx));
-  if(used.has(pick)){ toast("Cavro "+(pick+1)+" already has a lane","error"); return; }
+  if(used.has(pick)){ toast("Cavro "+pick+" already has a lane","error"); return; }
   if(used.size >= 4){ toast("Max 4 Cavro lanes","error"); return; }
-  const lane = { id: 'cavro'+pick, label:'Cavro '+(pick+1), type:'cavro', cavroIdx: pick };
+  const lane = { id: 'cavro'+pick, label:'Cavro '+pick, type:'cavro', cavroIdx: pick };
   tlLanes.push(lane); tlSaveLanes(); tlRender();
 }
 
