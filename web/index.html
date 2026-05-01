@@ -362,6 +362,62 @@ option { background:#fff; }
 .cfg-item .cfg-del { color:var(--red);cursor:pointer;font-size:14px;padding:0 4px;opacity:.6; }
 .cfg-item .cfg-del:hover { opacity:1; }
 .cfg-btns { display:flex;gap:8px;justify-content:flex-end; }
+.cfg-item-main { display:flex;align-items:center;gap:10px;flex:1; }
+.cfg-item-refs { font-size:10px;color:var(--text3);margin-top:3px;font-style:italic; }
+.cfg-item { flex-direction:column;align-items:stretch; }
+
+/* Config panel — simple list rows */
+.cfg-row { display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px;background:var(--bg); }
+.cfg-row:last-child { border-bottom:none; }
+.cfg-row.active { background:rgba(59,130,246,.05);border-left:3px solid var(--blue); }
+.cfg-row .star { color:var(--blue);font-weight:700;width:14px; }
+.cfg-row .cfg-name { font-weight:600;min-width:120px;color:var(--text); }
+.cfg-row .cfg-refs { flex:1;color:var(--text3);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.cfg-row .cfg-date { color:var(--text3);font-size:10px;margin-right:6px;font-family:monospace; }
+.cfg-row .cfg-btns { display:flex;gap:4px; }
+.cfg-empty { color:var(--text3);font-size:11px;font-style:italic;padding:14px;text-align:center; }
+
+/* Module accordion */
+.cfg-mod-row { display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;cursor:pointer;background:var(--bg);user-select:none; }
+.cfg-mod-row:hover { background:var(--bg2); }
+.cfg-mod-row .arrow { color:var(--text3);width:10px;font-size:10px;transition:transform .15s; }
+.cfg-mod-row.open .arrow { transform:rotate(90deg); }
+.cfg-mod-row .mod-label { font-weight:600;min-width:100px;color:var(--text); }
+.cfg-mod-row .mod-active { color:var(--blue);font-style:italic;font-size:11px;flex:1; }
+.cfg-mod-row .mod-count { color:var(--text3);font-size:10px;margin-right:6px; }
+.cfg-mod-detail { padding:0 12px 8px 32px;background:var(--bg2);border-bottom:1px solid var(--border); }
+.cfg-mod-detail .save-row { padding:6px 0; }
+.cfg-mod-saved-item { display:flex;align-items:center;gap:8px;padding:4px 8px;font-size:12px;border-bottom:1px dashed var(--border); }
+.cfg-mod-saved-item:last-child { border-bottom:none; }
+.cfg-mod-saved-item.active { background:rgba(59,130,246,.05); }
+.cfg-mod-saved-item .name { flex:1; }
+.cfg-mod-saved-item .date { color:var(--text3);font-size:10px;font-family:monospace;margin-right:6px; }
+
+/* Marker list (live view) */
+.marker-list { background:var(--bg2);border:1px solid var(--border);border-radius:3px;font-size:11px; }
+.marker-row { display:flex;align-items:center;gap:6px; }
+.marker-name { font-weight:600;min-width:80px; }
+.marker-coord { color:var(--text2);flex:1;font-size:10px;font-family:monospace; }
+.marker-empty { color:var(--text3);font-size:10px;font-style:italic; }
+
+/* Live view stage controls */
+.stage-bar { display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;margin:6px 0;font-size:11px; }
+.stage-bar label { font-weight:600;color:var(--text2); }
+.stage-bar input[type=number], .stage-bar input[readonly] { font-family:monospace;font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;background:var(--bg);width:64px; }
+.stage-bar input[readonly] { color:var(--text2);background:var(--bg2); }
+.jog-pad { display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,22px);gap:2px; }
+.jog-pad button { padding:0;font-size:11px;font-weight:700;border:1px solid var(--border);background:var(--bg);cursor:pointer;border-radius:2px; }
+.jog-pad button:hover { background:var(--blue);color:#fff;border-color:var(--blue); }
+.jog-pad .jog-empty { background:transparent;border:none;cursor:default; }
+.jog-z { display:flex;flex-direction:column;gap:2px; }
+.jog-z button { padding:1px 8px;font-size:11px;font-weight:600; }
+.stage-sep { width:1px;height:48px;background:var(--border);margin:0 4px; }
+.stage-bar select { padding:2px 4px;font-size:11px;border:1px solid var(--border);background:var(--bg);border-radius:3px;min-width:120px; }
+
+/* Per-panel mini picker */
+.module-cfg-picker { display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:3px;margin-bottom:10px;max-width:480px;font-size:11px; }
+.module-cfg-picker label { font-weight:600;color:var(--text2);margin-right:4px; }
+.module-cfg-picker select { flex:1;padding:3px 6px;font-size:11px;border:1px solid var(--border);border-radius:3px;background:var(--bg); }
 </style>
 </head>
 <body>
@@ -391,8 +447,9 @@ option { background:#fff; }
   <div class="app-body">
 
     <nav class="sidebar">
+      <a class="nav-item active" data-panel="config" onclick="switchPanel('config')">Config</a>
       <!-- <a class="nav-item" data-panel="pumps" onclick="switchPanel('pumps')">Pumps</a> -->
-      <a class="nav-item active" data-panel="cavro" onclick="switchPanel('cavro')">Cavro</a>
+      <a class="nav-item" data-panel="cavro" onclick="switchPanel('cavro')">Cavro</a>
       <a class="nav-item" data-panel="scope-setup" onclick="switchPanel('scope-setup')">Setup</a>
       <a class="nav-item" data-panel="cam-setup" onclick="switchPanel('cam-setup')">Camera</a>
       <a class="nav-item" data-panel="live" onclick="switchPanel('live')">Live</a>
@@ -404,6 +461,32 @@ option { background:#fff; }
 
     <div class="content">
 
+      <!-- ════════ CONFIG ════════ -->
+      <section id="panel-config" class="panel active">
+        <div class="panel-title">Configurations</div>
+
+        <div class="card" style="max-width:760px">
+          <div class="card-head"><span class="title">Master Configs</span></div>
+          <div class="section" style="padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg2)">
+            <div class="field" style="margin:0">
+              <input type="text" id="cfgMasterName" placeholder="Save current state as new master..." style="flex:1">
+              <button class="btn btn-sm blue" onclick="masterSaveCurrent()">Save</button>
+            </div>
+          </div>
+          <div class="section" style="padding:0">
+            <div id="cfgMastersList"></div>
+          </div>
+        </div>
+
+        <div class="card" style="max-width:760px">
+          <div class="card-head"><span class="title">Module Configs</span>
+            <span style="font-size:11px;color:var(--text3)">Click a row to manage saved configs for that module</span></div>
+          <div class="section" style="padding:0">
+            <div id="cfgModulesList"></div>
+          </div>
+        </div>
+      </section>
+
       <!-- ════════ PUMPS ════════ -->
       <section id="panel-pumps" class="panel">
         <div class="panel-title">Syringe Pumps</div>
@@ -411,8 +494,14 @@ option { background:#fff; }
       </section>
 
       <!-- ════════ CAVRO PUMPS ════════ -->
-      <section id="panel-cavro" class="panel active">
+      <section id="panel-cavro" class="panel">
         <div class="panel-title">Tecan Cavro Pumps</div>
+        <div class="module-cfg-picker">
+          <label>Cavro config</label>
+          <select id="cfgPicker_cavro"></select>
+          <button class="btn btn-sm" onclick="moduleCfgLoad('cavro')">Load</button>
+          <button class="btn btn-sm accent" onclick="moduleCfgSaveAs('cavro')">Save As</button>
+        </div>
         <div class="card" style="max-width:420px">
           <div class="card-head"><span class="title">RS-485 Bus</span>
             <span class="badge" id="cavroBusBadge">Offline</span></div>
@@ -459,6 +548,12 @@ option { background:#fff; }
       <!-- ════════ MICROSCOPE SETUP ════════ -->
       <section id="panel-scope-setup" class="panel">
         <div class="panel-title">Microscope Setup</div>
+        <div class="module-cfg-picker">
+          <label>Presets</label>
+          <select id="cfgPicker_presets"></select>
+          <button class="btn btn-sm" onclick="moduleCfgLoad('presets')">Load</button>
+          <button class="btn btn-sm accent" onclick="moduleCfgSaveAs('presets')">Save As</button>
+        </div>
         <div class="scope-grid">
 
           <!-- Nikon Ti Connection -->
@@ -592,6 +687,12 @@ option { background:#fff; }
       <!-- ════════ CAMERA SETUP ════════ -->
       <section id="panel-cam-setup" class="panel">
         <div class="panel-title">Camera Setup</div>
+        <div class="module-cfg-picker">
+          <label>Camera config</label>
+          <select id="cfgPicker_camera"></select>
+          <button class="btn btn-sm" onclick="moduleCfgLoad('camera')">Load</button>
+          <button class="btn btn-sm accent" onclick="moduleCfgSaveAs('camera')">Save As</button>
+        </div>
         <div class="cam-setup-grid">
 
           <!-- CoolSNAP Connection -->
@@ -709,6 +810,57 @@ option { background:#fff; }
             <div style="flex:1"></div>
             <div class="proto-status" id="scopeCamStatus"></div>
           </div>
+
+          <!-- Stage controls -->
+          <div class="stage-bar">
+            <label>X</label><input id="liveXPos" readonly value="—">
+            <label>Y</label><input id="liveYPos" readonly value="—">
+            <label>Z</label><input id="liveZPos" readonly value="—">
+            <span style="font-size:10px;color:var(--text3)">µm</span>
+            <button class="btn btn-sm" onclick="liveStageRefresh()" title="Refresh">↻</button>
+
+            <div class="stage-sep"></div>
+
+            <label>XY step</label>
+            <input type="number" id="liveXyStep" value="100" step="10" title="µm per jog">
+            <div class="jog-pad">
+              <button class="jog-empty"></button>
+              <button onclick="liveJog(0,1)" title="Y +">↑</button>
+              <button class="jog-empty"></button>
+              <button onclick="liveJog(-1,0)" title="X -">←</button>
+              <button class="jog-empty"></button>
+              <button onclick="liveJog(1,0)" title="X +">→</button>
+              <button class="jog-empty"></button>
+              <button onclick="liveJog(0,-1)" title="Y -">↓</button>
+              <button class="jog-empty"></button>
+            </div>
+
+            <div class="stage-sep"></div>
+
+            <label>Z step</label>
+            <input type="number" id="liveZStep" value="5" step="0.5" title="µm per jog">
+            <div class="jog-z">
+              <button class="btn btn-sm" onclick="liveZJog(1)" title="Z +">Z↑</button>
+              <button class="btn btn-sm" onclick="liveZJog(-1)" title="Z -">Z↓</button>
+            </div>
+
+            <div class="stage-sep"></div>
+
+            <label>Goto</label>
+            <select id="liveMarkerGoto"><option value="">— marker —</option></select>
+            <button class="btn btn-sm blue" onclick="liveGotoMarker()">Go</button>
+            <button class="btn btn-sm accent" onclick="liveMarkCurrentPrompt()" title="Mark current XYZ position">+ Mark</button>
+            <button class="btn btn-sm" onclick="toggleLiveMarkerList()" title="Show/hide markers list">List</button>
+
+            <div class="stage-sep"></div>
+
+            <label>AF</label>
+            <input type="number" id="liveAfRange" value="20" step="1" title="µm range" style="width:48px">
+            <input type="number" id="liveAfSteps" value="11" step="1" min="3" title="steps" style="width:42px">
+            <button class="btn btn-sm" onclick="liveAutoFocus()" id="liveAfBtn">Auto Focus</button>
+          </div>
+          <div id="liveAfStatus" style="font-size:11px;color:var(--text3);padding:0 4px 4px;display:none"></div>
+          <div id="liveMarkerList" class="marker-list" style="display:none;margin:0 0 6px 0;padding:4px 0"></div>
           <div class="live-quick" style="gap:8px;align-items:center">
             <span style="font-size:10px;color:var(--text3)">Brightness</span>
             <input type="range" id="dispBrightness" min="-100" max="100" value="0" step="1"
@@ -755,11 +907,15 @@ option { background:#fff; }
       <section id="panel-timeline" class="panel">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
           <div class="panel-title" style="margin-bottom:0">Experiment:</div>
-          <input type="text" id="tlExpName" placeholder="enter experiment name"
-                 style="flex:1;max-width:300px;font-size:16px;font-weight:600;padding:6px 10px">
-          <button class="btn btn-sm blue" onclick="cfgSave()" title="Save all presets, timeline, and pump settings">Save Config</button>
-          <button class="btn btn-sm" onclick="cfgShowLoad()" title="Load a saved configuration">Load Config</button>
-          <button class="btn btn-sm" onclick="tlClearAll()" title="Clear all events and lanes" style="margin-left:8px">Clear All</button>
+          <input type="text" id="tlExpName" placeholder="experiment name (used for output folder)"
+                 style="flex:1;max-width:340px;font-size:16px;font-weight:600;padding:6px 10px">
+          <button class="btn btn-sm" onclick="tlClearAll()" title="Clear all events and lanes">Clear All</button>
+        </div>
+        <div class="module-cfg-picker">
+          <label>Timeline config</label>
+          <select id="cfgPicker_timeline"></select>
+          <button class="btn btn-sm" onclick="moduleCfgLoad('timeline')">Load</button>
+          <button class="btn btn-sm accent" onclick="moduleCfgSaveAs('timeline')">Save As</button>
         </div>
         <div class="tl-layout">
 
@@ -962,6 +1118,12 @@ option { background:#fff; }
       <!-- ════════ OBSBOT ════════ -->
       <section id="panel-obsbot" class="panel">
         <div class="panel-title">OBSBOT Camera</div>
+        <div class="module-cfg-picker">
+          <label>OBSBOT config</label>
+          <select id="cfgPicker_obsbot"></select>
+          <button class="btn btn-sm" onclick="moduleCfgLoad('obsbot')">Load</button>
+          <button class="btn btn-sm accent" onclick="moduleCfgSaveAs('obsbot')">Save As</button>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
 
           <!-- Left column: connection + waypoints -->
@@ -1159,6 +1321,13 @@ function switchPanel(name) {
   document.querySelectorAll(".panel").forEach(p=>
     p.classList.toggle("active", p.id==="panel-"+name));
   if(name === 'viewer') npyRefreshList();
+  if(name === 'config') renderConfigPanel();
+  if(name === 'live') {
+    refreshLiveMarkerDropdown();
+    liveStartStagePolling();
+  } else {
+    liveStopStagePolling();
+  }
 }
 
 function updateIndicators() {
@@ -1737,6 +1906,222 @@ function scopeSetExposureFrom(v) {
   scopeSetExposure();
 }
 
+/* ── Live view stage controls ──────────────────────────────────────────── */
+
+let _liveStageInterval = null;
+let _afRunning = false;
+
+async function liveStageRefresh() {
+  if(!scopeTiConnected) {
+    document.getElementById("liveXPos").value = "—";
+    document.getElementById("liveYPos").value = "—";
+    document.getElementById("liveZPos").value = "—";
+    return;
+  }
+  try {
+    const xy = await api('ti_xy_get');
+    const z  = await api('ti_z_get');
+    if(xy.ok) {
+      document.getElementById("liveXPos").value = (xy.x/1000).toFixed(1);
+      document.getElementById("liveYPos").value = (xy.y/1000).toFixed(1);
+    }
+    if(z.ok) {
+      document.getElementById("liveZPos").value = (z.value/1000).toFixed(2);
+    }
+  } catch(e) {}
+}
+
+function liveStartStagePolling() {
+  if(_liveStageInterval) return;
+  liveStageRefresh();
+  _liveStageInterval = setInterval(liveStageRefresh, 500);
+}
+function liveStopStagePolling() {
+  if(_liveStageInterval) { clearInterval(_liveStageInterval); _liveStageInterval = null; }
+}
+
+async function liveJog(dx, dy) {
+  if(!scopeTiConnected) { toast("Connect Ti first","error"); return; }
+  const stepUm = parseFloat(document.getElementById("liveXyStep").value) || 100;
+  const stepNm = Math.round(stepUm * 1000);
+  if(dx !== 0) await api('ti_x_move_rel', dx * stepNm);
+  if(dy !== 0) await api('ti_y_move_rel', dy * stepNm);
+  liveStageRefresh();
+}
+
+async function liveZJog(dir) {
+  if(!scopeTiConnected) { toast("Connect Ti first","error"); return; }
+  const stepUm = parseFloat(document.getElementById("liveZStep").value) || 5;
+  const stepNm = Math.round(stepUm * 1000);
+  await api('ti_z_move_rel', dir * stepNm);
+  liveStageRefresh();
+}
+
+/* ── Markers (flat list, independent of presets) ──────────────────── */
+
+function markersGetAll() {
+  const v = _loadStore("mosaic_markers");
+  return Array.isArray(v) ? v : [];
+}
+function markersSave(arr) { _saveStore("mosaic_markers", arr); }
+function markersGet(id)   { return markersGetAll().find(m => m.id === id); }
+
+function refreshLiveMarkerDropdown() {
+  const sel = document.getElementById("liveMarkerGoto");
+  if(!sel) return;
+  const markers = markersGetAll();
+  sel.innerHTML = `<option value="">— marker —</option>` +
+    markers.map(m => `<option value="${m.id}">${m.name}</option>`).join("");
+  if(typeof renderLiveMarkerList === 'function') renderLiveMarkerList();
+}
+
+async function liveGotoMarker() {
+  const id = document.getElementById("liveMarkerGoto").value;
+  if(!id) { toast("Pick a marker","error"); return; }
+  await markerGoto(id);
+}
+
+async function markerGoto(id) {
+  if(!scopeTiConnected) { toast("Connect Ti first","error"); return; }
+  const m = markersGet(id);
+  if(!m) { toast("Marker not found","error"); return; }
+  const r1 = await api('ti_xy_move_abs', m.x_nm, m.y_nm);
+  if(r1 && r1.error) { toast("XY move: "+r1.error,"error"); return; }
+  const r2 = await api('ti_z_move_abs',  m.z_nm);
+  if(r2 && r2.error) { toast("Z move: "+r2.error,"error"); return; }
+  if(typeof scopeXYRefresh === 'function') scopeXYRefresh();
+  if(typeof scopeZRefresh === 'function') scopeZRefresh();
+  liveStageRefresh();
+  toast(`Goto: ${m.name}`,"success");
+}
+
+function markerDelete(id) {
+  const m = markersGet(id);
+  if(!m) return;
+  if(!confirm(`Delete marker '${m.name}'?`)) return;
+  markersSave(markersGetAll().filter(x => x.id !== id));
+  refreshLiveMarkerDropdown();
+}
+
+async function liveMarkCurrentPrompt() {
+  if(!scopeTiConnected) { toast("Connect Ti first","error"); return; }
+  const defaultName = "Spot " + String.fromCharCode(65 + markersGetAll().length);
+  const name = prompt("Marker name:", defaultName);
+  if(!name || !name.trim()) return;
+  try {
+    const xy = await api('ti_xy_get');
+    const z  = await api('ti_z_get');
+    if(xy.error || z.error) { toast("Failed to read stage","error"); return; }
+    const obj = await api('ti_nosepiece_get').catch(()=>({}));
+    const arr = markersGetAll();
+    arr.push({
+      id: 'm_' + Date.now().toString(36) + Math.floor(Math.random()*999).toString(36),
+      name: name.trim(),
+      x_nm: xy.x, y_nm: xy.y, z_nm: z.value,
+      objective: obj.value || null,
+      created: new Date().toISOString(),
+    });
+    markersSave(arr);
+    refreshLiveMarkerDropdown();
+    toast(`Marked: ${name}`,"success");
+    logMsg(`Marker added: ${name}`,"sys");
+  } catch(e) { toast("Mark failed: "+e.message,"error"); }
+}
+
+let _liveMarkersExpanded = false;
+function toggleLiveMarkerList() {
+  _liveMarkersExpanded = !_liveMarkersExpanded;
+  renderLiveMarkerList();
+}
+function renderLiveMarkerList() {
+  const wrap = document.getElementById("liveMarkerList");
+  if(!wrap) return;
+  const markers = markersGetAll();
+  if(!_liveMarkersExpanded) {
+    wrap.style.display = "none";
+    return;
+  }
+  wrap.style.display = "";
+  if(!markers.length) {
+    wrap.innerHTML = `<div class="marker-empty" style="padding:6px 12px">No markers yet</div>`;
+    return;
+  }
+  wrap.innerHTML = markers.map(m => {
+    const xum = (m.x_nm/1000).toFixed(1), yum = (m.y_nm/1000).toFixed(1), zum = (m.z_nm/1000).toFixed(2);
+    return `<div class="marker-row" style="padding:3px 12px">
+      <span class="marker-name">${m.name}</span>
+      <span class="marker-coord">X ${xum} · Y ${yum} · Z ${zum} µm</span>
+      <button class="btn btn-sm blue" onclick="markerGoto('${m.id}')" style="padding:1px 6px;font-size:9px">Goto</button>
+      <button class="btn btn-sm" onclick="markerDelete('${m.id}')" style="padding:1px 6px;font-size:9px;color:var(--red)">×</button>
+    </div>`;
+  }).join("");
+}
+
+async function liveAutoFocus() {
+  if(_afRunning) { toast("AF already running","info"); return; }
+  if(!scopeCamConnected) { toast("Connect camera first","error"); return; }
+  if(!scopeTiConnected) { toast("Connect Ti first","error"); return; }
+  const rangeUm = parseFloat(document.getElementById("liveAfRange").value) || 20;
+  const steps   = parseInt(document.getElementById("liveAfSteps").value) || 11;
+  const rangeNm = Math.round(rangeUm * 1000);
+  _afRunning = true;
+  const btn = document.getElementById("liveAfBtn");
+  btn.disabled = true;
+  btn.textContent = "AF…";
+  const status = document.getElementById("liveAfStatus");
+  status.style.display = "";
+  status.textContent = `Autofocus starting (${steps} steps over ${rangeUm}µm)…`;
+  try {
+    const r = await api('cam_autofocus', rangeNm, steps);
+    if(r.error) {
+      toast("AF error: "+r.error,"error");
+      status.textContent = "AF error: "+r.error;
+    } else {
+      const zUm = (r.best_z_nm/1000).toFixed(2);
+      status.textContent = `AF complete: best Z = ${zUm} µm  (score ${r.best_score.toFixed(1)})`;
+      toast(`Focused at Z=${zUm} µm`,"success");
+      logMsg(`Autofocus: Z=${zUm}µm score=${r.best_score.toFixed(1)}`,"camera");
+      liveStageRefresh();
+    }
+  } catch(e) {
+    toast("AF failed: "+e.message,"error");
+  } finally {
+    _afRunning = false;
+    btn.disabled = false;
+    btn.textContent = "Auto Focus";
+  }
+}
+
+/* Arrow-key bindings for live view */
+document.addEventListener("keydown", (e) => {
+  const liveActive = document.getElementById("panel-live")?.classList.contains("active");
+  if(!liveActive) return;
+  const tag = (e.target.tagName||"").toLowerCase();
+  if(tag === "input" || tag === "textarea" || tag === "select") return;
+  let handled = true;
+  switch(e.key) {
+    case "ArrowLeft":  liveJog(-1, 0); break;
+    case "ArrowRight": liveJog( 1, 0); break;
+    case "ArrowUp":    liveJog( 0, 1); break;
+    case "ArrowDown":  liveJog( 0,-1); break;
+    case "PageUp":     liveZJog(1);  break;
+    case "PageDown":   liveZJog(-1); break;
+    default: handled = false;
+  }
+  if(handled) e.preventDefault();
+});
+
+onEvent("onAutofocusProgress", (i, total, msg) => {
+  const status = document.getElementById("liveAfStatus");
+  if(status) {
+    status.style.display = "";
+    status.textContent = `AF ${i}/${total}  ${msg||''}`;
+  }
+});
+onEvent("onAutofocusComplete", (best_z, score) => {
+  liveStageRefresh();
+});
+
 /* Display: brightness / contrast / gamma */
 let _dispBcgDebounce = null;
 function dispBcgChanged() {
@@ -2114,7 +2499,7 @@ function msSavePreset() {
     lampOn: _lampOn,
     shutterOpen: _shutterOpen,
     ilNd: parseInt(document.getElementById("ilNdSelect").value),
-    ilShutterOpen: _intensiOn
+    ilShutterOpen: _intensiOn,
   };
   _saveStore("mosaic_ms_presets", obj);
   document.getElementById("msPresetName").value = "";
@@ -2172,11 +2557,12 @@ function renderMsPresets() {
     const lamp = p.lampOn ? `Lamp:On/${p.lampIntensity??0}` : `Lamp:Off`;
     const shtr = p.shutterOpen != null ? (p.shutterOpen ? ' Sh:Open' : ' Sh:Closed') : '';
     const ilSh = p.ilShutterOpen != null ? (p.ilShutterOpen ? ' IL:Open' : ' IL:Closed') : '';
-    return `<div class="preset-chip" onclick="msEditPreset('${n}')">
+    const safeName = n.replace(/'/g, "\\'");
+    return `<div class="preset-chip" onclick="msEditPreset('${safeName}')">
       <span>${n}</span>
       <span style="font-size:10px;color:var(--text3)">Obj:${objNames[p.objective]||p.objective} F:${p.filter} ${lamp}${shtr}${ilSh} ND:${p.ilNd??'-'}</span>
-      <button class="btn btn-sm" onclick="event.stopPropagation();msLoadPreset('${n}')" title="Apply to hardware" style="padding:1px 6px;font-size:9px">Apply</button>
-      <span class="del" onclick="event.stopPropagation();msDeletePreset('${n}')">&times;</span>
+      <button class="btn btn-sm" onclick="event.stopPropagation();msLoadPreset('${safeName}')" title="Apply to hardware" style="padding:1px 6px;font-size:9px">Apply</button>
+      <span class="del" onclick="event.stopPropagation();msDeletePreset('${safeName}')">&times;</span>
     </div>`;
   }).join("") || '<span style="font-size:11px;color:var(--text3)">No presets saved</span>';
 }
@@ -2283,107 +2669,388 @@ function refreshAcqDropdowns() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   CONFIGURATION SAVE / LOAD  (single JSON file: all presets + timeline + cavro)
+   MODULAR CONFIGURATION
+   - 6 module configs: camera, microscope, presets, timeline, cavro, obsbot
+   - Master configs reference module configs by name (mix-and-match)
+   - Per-panel pickers let you swap a single module mid-session
    ═══════════════════════════════════════════════════════════════════════════ */
-function expGatherState() {
+const CFG_MODULES = ["camera", "presets", "timeline", "cavro", "obsbot"];
+const CFG_MODULE_LABELS = {
+  camera: "Camera", presets: "Presets",
+  timeline: "Timeline", cavro: "Cavro", obsbot: "OBSBOT"
+};
+
+let _activeMaster = null;   // name of currently loaded master (or null)
+let _activeModule = { camera:null, presets:null,
+                      timeline:null, cavro:null, obsbot:null };
+
+// ── Per-module gather/restore ───────────────────────────────────────────────
+
+function camGatherConfig() {
+  const exp = parseInt(document.getElementById("scopeExposure")?.value);
+  const bin = parseInt(document.getElementById("scopeBinning")?.value);
+  return {
+    exposure_ms: Number.isFinite(exp) ? exp : null,
+    binning: Number.isFinite(bin) ? bin : null,
+  };
+}
+async function camRestoreConfig(p) {
+  if(!p) return;
+  if(p.exposure_ms != null) {
+    document.getElementById("scopeExposure").value = p.exposure_ms;
+    if(scopeCamConnected) await api('cam_set_exposure', p.exposure_ms).catch(()=>{});
+  }
+  if(p.binning != null) {
+    document.getElementById("scopeBinning").value = p.binning;
+    if(scopeCamConnected) await api('cam_set_binning', p.binning).catch(()=>{});
+  }
+}
+
+function presetsGatherConfig() {
+  return {
+    microscopePresets:  _loadStore("mosaic_ms_presets") || {},
+    acquisitionPresets: _loadStore("mosaic_acq_presets") || {},
+    markers:            _loadStore("mosaic_markers") || [],
+  };
+}
+function presetsRestoreConfig(p) {
+  if(!p) return;
+  if(p.microscopePresets) _saveStore("mosaic_ms_presets",  p.microscopePresets);
+  if(p.acquisitionPresets) _saveStore("mosaic_acq_presets", p.acquisitionPresets);
+  if(Array.isArray(p.markers)) _saveStore("mosaic_markers", p.markers);
+  renderMsPresets();
+  renderAcqPresets();
+  refreshAcqDropdowns();
+  if(typeof refreshLiveMarkerDropdown === 'function') refreshLiveMarkerDropdown();
+}
+
+function tlGatherConfig() {
   const durEl = document.getElementById("tlDuration");
   const unitEl = document.getElementById("tlDurUnit");
   const repEl = document.getElementById("tlRepeat");
   const forEl = document.getElementById("tlForever");
   return {
-    microscopePresets:  _loadStore("mosaic_ms_presets"),
-    acquisitionPresets: _loadStore("mosaic_acq_presets"),
-    timeline: {
-      events: tlEvents,
-      lanes:  tlLanes,
-      cycleDuration: parseFloat(durEl ? durEl.value : 60),
-      cycleDurationUnit: unitEl ? unitEl.value : 'm',
-      repeatCount: parseInt(repEl ? repEl.value : 1),
-      forever: forEl ? forEl.checked : false
-    },
-    cavro: {
-      syringe_ml: parseFloat(document.getElementById("cavroSyringe")?.value) || 0.5,
-      valve_positions: parseInt(document.getElementById("cavroValves")?.value) || 6,
-      addresses: document.getElementById("cavroAddresses")?.value || "0,1,2,3",
-    }
+    events: tlEvents,
+    lanes:  tlLanes,
+    cycleDuration: parseFloat(durEl ? durEl.value : 60),
+    cycleDurationUnit: unitEl ? unitEl.value : 'm',
+    repeatCount: parseInt(repEl ? repEl.value : 1),
+    forever: forEl ? forEl.checked : false,
   };
 }
-
-function expRestoreState(data) {
-  if(data.microscopePresets) {
-    _saveStore("mosaic_ms_presets", data.microscopePresets);
-    renderMsPresets();
-    refreshAcqDropdowns();
-  }
-  if(data.acquisitionPresets) {
-    _saveStore("mosaic_acq_presets", data.acquisitionPresets);
-    renderAcqPresets();
-    refreshAcqDropdowns();
-  }
-  if(data.timeline) {
-    const tl = data.timeline;
-    tlEvents = tl.events || [];
-    tlLanes  = tl.lanes  || [{id:"imaging", label:"Imaging", type:"imaging"}];
-    tlSaveEvents(); tlSaveLanes();
-    if(tl.cycleDuration != null) document.getElementById("tlDuration").value = tl.cycleDuration;
-    if(tl.cycleDurationUnit)     document.getElementById("tlDurUnit").value  = tl.cycleDurationUnit;
-    if(tl.repeatCount != null)   document.getElementById("tlRepeat").value   = tl.repeatCount;
-    if(tl.forever != null)       document.getElementById("tlForever").checked = tl.forever;
-    tlSelectedId = null;
-    document.getElementById("tlEditor").classList.remove("open");
-    tlUpdateTotalTime();
-    tlRender();
-  }
-  if(data.cavro) {
-    const c = data.cavro;
-    if(c.syringe_ml != null)     document.getElementById("cavroSyringe").value   = c.syringe_ml;
-    if(c.valve_positions != null) document.getElementById("cavroValves").value    = c.valve_positions;
-    if(c.addresses)              document.getElementById("cavroAddresses").value = c.addresses;
-  }
+function tlRestoreConfig(p) {
+  if(!p) return;
+  tlEvents = p.events || [];
+  tlLanes  = p.lanes  || [{id:"imaging", label:"Imaging", type:"imaging"}];
+  tlSaveEvents(); tlSaveLanes();
+  if(p.cycleDuration != null)   document.getElementById("tlDuration").value = p.cycleDuration;
+  if(p.cycleDurationUnit)       document.getElementById("tlDurUnit").value  = p.cycleDurationUnit;
+  if(p.repeatCount != null)     document.getElementById("tlRepeat").value   = p.repeatCount;
+  if(p.forever != null)         document.getElementById("tlForever").checked = p.forever;
+  tlSelectedId = null;
+  document.getElementById("tlEditor")?.classList.remove("open");
+  tlUpdateTotalTime();
+  tlRender();
 }
 
-async function cfgSave() {
-  const name = document.getElementById("tlExpName").value.trim();
-  if(!name){ toast("Enter a configuration name first","error"); return; }
-  const payload = expGatherState();
-  const res = await api('config_save_named', name, payload);
-  if(res.error){ toast(res.error,"error"); logMsg("Config save: "+res.error,"error"); return; }
-  toast("Configuration saved: " + name, "success");
-  logMsg("Configuration saved: "+name,"sys");
+function cavroGatherConfig() {
+  return {
+    syringe_ml:      parseFloat(document.getElementById("cavroSyringe")?.value) || 0.5,
+    valve_positions: parseInt(document.getElementById("cavroValves")?.value) || 6,
+    addresses:       document.getElementById("cavroAddresses")?.value || "0,1,2,3",
+  };
+}
+function cavroRestoreConfig(p) {
+  if(!p) return;
+  if(p.syringe_ml != null)      document.getElementById("cavroSyringe").value   = p.syringe_ml;
+  if(p.valve_positions != null) document.getElementById("cavroValves").value    = p.valve_positions;
+  if(p.addresses)               document.getElementById("cavroAddresses").value = p.addresses;
 }
 
-async function cfgShowLoad() {
-  const res = await api('config_list_named');
+async function obsbotGatherConfig() {
+  const waypoints = await api('obsbot_list_waypoints').catch(()=>({waypoints:[]}));
+  const crops = await api('obsbot_monitor_get_crops').catch(()=>({crops:{}}));
+  return {
+    ip:        document.getElementById("obsbotIp")?.value || "",
+    rtsp_url:  document.getElementById("obsbotRtsp")?.value || "",
+    waypoints: (waypoints && waypoints.waypoints) || [],
+    crops:     (crops && crops.crops) || {temp:null, co2:null},
+  };
+}
+async function obsbotRestoreConfig(p) {
+  if(!p) return;
+  if(p.ip)       document.getElementById("obsbotIp").value   = p.ip;
+  if(p.rtsp_url) document.getElementById("obsbotRtsp").value = p.rtsp_url;
+  if(Array.isArray(p.waypoints))
+    await api('obsbot_set_waypoints', p.waypoints).catch(()=>{});
+  if(p.crops && typeof p.crops === 'object')
+    await api('obsbot_set_crops', p.crops).catch(()=>{});
+}
+
+const MODULE_HANDLERS = {
+  camera:     { gather: camGatherConfig,    restore: camRestoreConfig },
+  presets:    { gather: presetsGatherConfig,restore: presetsRestoreConfig },
+  timeline:   { gather: tlGatherConfig,     restore: tlRestoreConfig },
+  cavro:      { gather: cavroGatherConfig,  restore: cavroRestoreConfig },
+  obsbot:     { gather: obsbotGatherConfig, restore: obsbotRestoreConfig },
+};
+
+/* Snapshot of all module configs, stamped into each experiment's .meta.json */
+function expGatherSnapshot() {
+  const snap = {};
+  for(const [m, h] of Object.entries(MODULE_HANDLERS)) {
+    try { snap[m] = h.gather(); } catch(e) { snap[m] = null; }
+  }
+  return snap;
+}
+
+// ── Module config operations ────────────────────────────────────────────────
+
+async function moduleGather(module) {
+  const h = MODULE_HANDLERS[module];
+  if(!h) return null;
+  const result = h.gather();
+  return (result && typeof result.then === 'function') ? await result : result;
+}
+
+async function moduleRestore(module, payload) {
+  const h = MODULE_HANDLERS[module];
+  if(!h) return;
+  const r = h.restore(payload);
+  if(r && typeof r.then === 'function') await r;
+}
+
+async function moduleCfgSaveAs(module, defaultName) {
+  const name = prompt(`Save current ${CFG_MODULE_LABELS[module]} settings as:`,
+                      defaultName || _activeModule[module] || "");
+  if(!name || !name.trim()) return;
+  const payload = await moduleGather(module);
+  const res = await api('config_module_save', module, name.trim(), payload);
+  if(res.error) { toast(res.error, "error"); return; }
+  _activeModule[module] = name.trim();
+  toast(`${CFG_MODULE_LABELS[module]} saved: ${name.trim()}`, "success");
+  logMsg(`${CFG_MODULE_LABELS[module]} config saved: ${name.trim()}`, "sys");
+  await refreshModulePicker(module);
+  renderConfigPanel();
+}
+
+async function moduleCfgLoad(module, name) {
+  if(!name) {
+    const sel = document.getElementById(`cfgPicker_${module}`);
+    name = sel ? sel.value : null;
+  }
+  if(!name) { toast("Select a config first", "error"); return; }
+  const res = await api('config_module_load', module, name);
+  if(res.error) { toast(res.error, "error"); return; }
+  await moduleRestore(module, res.data?.payload);
+  _activeModule[module] = name;
+  toast(`${CFG_MODULE_LABELS[module]} loaded: ${name}`, "success");
+  logMsg(`${CFG_MODULE_LABELS[module]} config loaded: ${name}`, "sys");
+  await refreshModulePicker(module);
+  renderConfigPanel();
+}
+
+async function moduleCfgDelete(module, name) {
+  if(!confirm(`Delete ${CFG_MODULE_LABELS[module]} config '${name}'?`)) return;
+  const res = await api('config_module_delete', module, name);
+  if(res.error) { toast(res.error, "error"); return; }
+  if(_activeModule[module] === name) _activeModule[module] = null;
+  await refreshModulePicker(module);
+  renderConfigPanel();
+}
+
+async function refreshModulePicker(module) {
+  const sel = document.getElementById(`cfgPicker_${module}`);
+  if(!sel) return;
+  const res = await api('config_module_list', module);
   const configs = (res && res.configs) || [];
-  if(!configs.length){ toast("No saved configurations","info"); return; }
-  _cfgShowModal(configs, false);
+  const cur = _activeModule[module] || "";
+  sel.innerHTML = `<option value="">— none —</option>` +
+    configs.map(c => `<option value="${c.name}" ${c.name===cur?'selected':''}>${c.name}</option>`).join("");
 }
 
-function _cfgShowModal(configs, isStartup) {
-  let sel = null;
+async function refreshAllModulePickers() {
+  for(const m of CFG_MODULES) await refreshModulePicker(m);
+}
+
+// ── Master config operations ────────────────────────────────────────────────
+
+async function masterSave(name, moduleRefs) {
+  const res = await api('config_master_save', name, moduleRefs);
+  if(res.error) { toast(res.error, "error"); return false; }
+  _activeMaster = name;
+  toast(`Master saved: ${name}`, "success");
+  logMsg(`Master config saved: ${name}`, "sys");
+  renderConfigPanel();
+  return true;
+}
+
+async function masterSaveCurrent() {
+  const nameEl = document.getElementById("cfgMasterName");
+  const name = nameEl.value.trim();
+  if(!name) { toast("Enter a master name", "error"); return; }
+  // Snapshot whatever module configs are currently active. Users adjust
+  // active modules via the per-panel mini pickers (Cavro/Camera/etc.).
+  const refs = {};
+  for(const m of CFG_MODULES) refs[m] = _activeModule[m] || null;
+  const ok = await masterSave(name, refs);
+  if(ok) nameEl.value = "";
+}
+
+async function masterLoad(name) {
+  const res = await api('config_master_load', name);
+  if(res.error) { toast(res.error, "error"); return; }
+  const modules = res.modules || {};
+  const missing = [];
+  for(const m of CFG_MODULES) {
+    const entry = modules[m];
+    if(!entry) { _activeModule[m] = null; continue; }
+    if(entry.error) { missing.push(`${m}:${entry.name}`); _activeModule[m] = null; continue; }
+    await moduleRestore(m, entry.payload);
+    _activeModule[m] = entry.name;
+  }
+  _activeMaster = name;
+  if(missing.length)
+    toast(`Master loaded with missing: ${missing.join(", ")}`, "error");
+  else
+    toast(`Master loaded: ${name}`, "success");
+  logMsg(`Master config loaded: ${name}`, "sys");
+  await refreshAllModulePickers();
+  renderConfigPanel();
+}
+
+async function masterDelete(name) {
+  if(!confirm(`Delete master config '${name}'? (Module configs are kept.)`)) return;
+  const res = await api('config_master_delete', name);
+  if(res.error) { toast(res.error, "error"); return; }
+  if(_activeMaster === name) _activeMaster = null;
+  renderConfigPanel();
+}
+
+async function masterDuplicate(name) {
+  const newName = prompt(`Duplicate master '${name}' as:`, name + " copy");
+  if(!newName || !newName.trim()) return;
+  const res = await api('config_master_load', name);
+  if(res.error) { toast(res.error, "error"); return; }
+  const refs = (res.master && res.master.modules) || {};
+  await masterSave(newName.trim(), refs);
+}
+
+// ── Config panel rendering ──────────────────────────────────────────────────
+
+const _fmtCfgDate = (iso) => {
+  if(!iso) return "";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString() + " " +
+           d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  } catch(e){ return iso; }
+};
+
+let _cfgExpandedModule = null;
+
+async function renderConfigPanel() {
+  const mastersEl = document.getElementById("cfgMastersList");
+  const modulesEl = document.getElementById("cfgModulesList");
+  if(!mastersEl || !modulesEl) return;
+
+  // ── Masters: simple one-line rows
+  const mastersRes = await api('config_master_list');
+  const masters = (mastersRes && mastersRes.masters) || [];
+  if(!masters.length) {
+    mastersEl.innerHTML = `<div class="cfg-empty">No master configs saved yet</div>`;
+  } else {
+    mastersEl.innerHTML = masters.map(m => {
+      const refs = Object.entries(m.modules || {})
+        .filter(([k,v]) => v)
+        .map(([k,v]) => `${CFG_MODULE_LABELS[k]||k}:${v}`)
+        .join(" · ");
+      const isActive = _activeMaster === m.name;
+      const safe = m.name.replace(/'/g,"\\'");
+      return `<div class="cfg-row ${isActive?'active':''}">
+        <span class="star">${isActive ? '★' : ''}</span>
+        <span class="cfg-name">${m.name}</span>
+        <span class="cfg-refs" title="${refs}">${refs || '(empty)'}</span>
+        <span class="cfg-date">${_fmtCfgDate(m.saved)}</span>
+        <span class="cfg-btns">
+          <button class="btn btn-sm blue" onclick="masterLoad('${safe}')">Load</button>
+          <button class="btn btn-sm" onclick="masterDuplicate('${safe}')" title="Duplicate">⎘</button>
+          <button class="btn btn-sm" style="color:var(--red)" onclick="masterDelete('${safe}')" title="Delete">×</button>
+        </span>
+      </div>`;
+    }).join("");
+  }
+
+  // ── Modules: collapsed accordion rows
+  const moduleRows = await Promise.all(CFG_MODULES.map(async m => {
+    const r = await api('config_module_list', m);
+    const configs = (r && r.configs) || [];
+    const active = _activeModule[m];
+    const isOpen = _cfgExpandedModule === m;
+    const activeText = active ? `loaded: ${active}` : 'no config loaded';
+
+    let detailHtml = '';
+    if(isOpen) {
+      const items = configs.length
+        ? configs.map(c => {
+            const isAct = c.name === active;
+            const safe = c.name.replace(/'/g,"\\'");
+            return `<div class="cfg-mod-saved-item ${isAct?'active':''}">
+              <span class="name">${isAct?'★ ':''}${c.name}</span>
+              <span class="date">${_fmtCfgDate(c.saved)}</span>
+              <button class="btn btn-sm blue" onclick="event.stopPropagation();moduleCfgLoad('${m}','${safe}')">Load</button>
+              <button class="btn btn-sm" style="color:var(--red)" onclick="event.stopPropagation();moduleCfgDelete('${m}','${safe}')">×</button>
+            </div>`;
+          }).join("")
+        : `<div class="cfg-empty" style="padding:8px">No saved configs</div>`;
+      detailHtml = `<div class="cfg-mod-detail">
+        ${items}
+        <div class="save-row">
+          <button class="btn btn-sm accent" onclick="event.stopPropagation();moduleCfgSaveAs('${m}')">Save current settings as new ${CFG_MODULE_LABELS[m]} config</button>
+        </div>
+      </div>`;
+    }
+    return `<div class="cfg-mod-row ${isOpen?'open':''}" onclick="cfgToggleModule('${m}')">
+        <span class="arrow">▶</span>
+        <span class="mod-label">${CFG_MODULE_LABELS[m]}</span>
+        <span class="mod-active">${activeText}</span>
+        <span class="mod-count">${configs.length} saved</span>
+      </div>${detailHtml}`;
+  }));
+  modulesEl.innerHTML = moduleRows.join("");
+}
+
+function cfgToggleModule(m) {
+  _cfgExpandedModule = _cfgExpandedModule === m ? null : m;
+  renderConfigPanel();
+}
+
+// ── Startup / picker modal ──────────────────────────────────────────────────
+
+function _cfgShowMasterModal(masters, isStartup) {
   const overlay = document.createElement("div");
   overlay.className = "cfg-overlay";
 
-  const fmtDate = (iso) => {
-    if(!iso) return "";
-    try { const d = new Date(iso); return d.toLocaleDateString() + " " + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
-    catch(e){ return iso; }
-  };
-
-  const items = configs.map((c,i) =>
-    `<div class="cfg-item" data-idx="${i}" onclick="this.parentElement.querySelectorAll('.cfg-item').forEach(e=>e.classList.remove('selected'));this.classList.add('selected')">
-      <span class="cfg-name">${c.name}</span>
-      <span class="cfg-date">${fmtDate(c.saved)}</span>
-      <span class="cfg-del" onclick="event.stopPropagation();cfgDeleteFromModal('${c.name.replace(/'/g,"\\'")}',this)" title="Delete">&times;</span>
-    </div>`
-  ).join("");
+  const items = masters.map((m,i) => {
+    const refs = Object.entries(m.modules || {})
+      .filter(([k,v]) => v)
+      .map(([k,v]) => `${CFG_MODULE_LABELS[k]||k}:${v}`)
+      .join(" · ");
+    return `<div class="cfg-item" data-name="${m.name.replace(/"/g,'&quot;')}" onclick="this.parentElement.querySelectorAll('.cfg-item').forEach(e=>e.classList.remove('selected'));this.classList.add('selected')">
+      <div class="cfg-item-main">
+        <span class="cfg-name">${m.name}</span>
+        <span class="cfg-date">${_fmtCfgDate(m.saved)}</span>
+      </div>
+      <div class="cfg-item-refs">${refs || '<em>(empty)</em>'}</div>
+    </div>`;
+  }).join("");
 
   overlay.innerHTML = `<div class="cfg-modal">
-    <h3>${isStartup ? 'Load Configuration' : 'Load Configuration'}</h3>
+    <h3>${isStartup ? 'Load Configuration' : 'Choose Master Config'}</h3>
     <div class="cfg-list">${items}</div>
     <div class="cfg-btns">
-      ${isStartup ? '<button class="btn btn-sm" onclick="cfgCloseModal()">Skip</button>' : '<button class="btn btn-sm" onclick="cfgCloseModal()">Cancel</button>'}
-      <button class="btn btn-sm blue" onclick="cfgLoadSelected()">Load</button>
+      <button class="btn btn-sm" onclick="cfgCloseModal()">${isStartup?'Skip':'Cancel'}</button>
+      <button class="btn btn-sm blue" onclick="cfgLoadSelectedMaster()">Load</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -2395,26 +3062,21 @@ function cfgCloseModal() {
   document.querySelector(".cfg-overlay")?.remove();
 }
 
-async function cfgLoadSelected() {
-  const selected = document.querySelector(".cfg-item.selected");
-  if(!selected){ toast("Select a configuration","error"); return; }
-  const name = selected.querySelector(".cfg-name").textContent;
-  const res = await api('config_load_named', name);
-  if(res.error){ toast(res.error,"error"); logMsg("Config load: "+res.error,"error"); return; }
-  document.getElementById("tlExpName").value = res.data.name || name;
-  expRestoreState(res.data.payload);
-  toast("Loaded: " + name, "success");
-  logMsg("Configuration loaded: "+name,"sys");
+async function cfgLoadSelectedMaster() {
+  const sel = document.querySelector(".cfg-item.selected");
+  if(!sel) { toast("Select a config","error"); return; }
+  const name = sel.dataset.name || sel.querySelector(".cfg-name")?.textContent;
+  if(!name) return;
   cfgCloseModal();
+  await masterLoad(name);
 }
 
-async function cfgDeleteFromModal(name, el) {
-  if(!confirm("Delete configuration '" + name + "'?")) return;
-  await api('config_delete_named', name);
-  const item = el.closest(".cfg-item");
-  item.remove();
-  const remaining = document.querySelectorAll(".cfg-item");
-  if(!remaining.length) cfgCloseModal();
+async function cfgStartupPrompt() {
+  try {
+    const mres = await api('config_master_list');
+    const masters = (mres && mres.masters) || [];
+    if(masters.length) _cfgShowMasterModal(masters, true);
+  } catch(e) {}
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2773,6 +3435,8 @@ function tlRender() {
           blockLabel = `${ev.name} — Cont`;
         } else if(ev.cavroAction === 'dispense') {
           blockLabel = `${ev.name} — Disp`;
+        } else if(ev.cavroAction === 'withdraw') {
+          blockLabel = `${ev.name} — Wdraw`;
         }
       }
       div.innerHTML = `<span class="ev-label">${blockLabel}</span>` +
@@ -2967,7 +3631,7 @@ function tlOpenEditor(ev) {
   } else if(ev.type === 'timelapse') {
     ev.duration = tlTimelapseCalcDuration(ev);
     durField.style.display = 'none';
-  } else if(ev.type === 'cavro' && ev.cavroAction === 'dispense') {
+  } else if(ev.type === 'cavro' && (ev.cavroAction === 'dispense' || ev.cavroAction === 'withdraw')) {
     durField.style.display = 'none';
   } else if(ev.type === 'video') {
     durField.style.display = '';
@@ -3043,6 +3707,7 @@ function tlOpenEditor(ev) {
       <label>Action</label>
       <select id="tlEdCavroAction" onchange="tlEditorChanged()" style="min-width:90px">
         <option value="dispense" ${act==='dispense'?'selected':''}>Dispense</option>
+        <option value="withdraw" ${act==='withdraw'?'selected':''}>Withdraw</option>
         <option value="continuous" ${act==='continuous'?'selected':''}>Continuous</option>
         <option value="coordinated" ${act==='coordinated'?'selected':''}>Coordinated</option>
         <option value="dualpush" ${act==='dualpush'?'selected':''}>Dual Push</option>
@@ -3062,6 +3727,32 @@ function tlOpenEditor(ev) {
         <label>Vol mL</label>
         <input type="number" id="tlEdCavroVol" value="${ev.volume||0.5}" min="0" step="0.01"
                style="width:60px" oninput="tlEditorChanged()">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Vel</label>
+        <input type="number" id="tlEdCavroVel" value="${ev.velocity||''}" step="0.01"
+               placeholder="auto" style="width:60px" oninput="tlEditorChanged()">
+        <select id="tlEdCavroVelUnit" onchange="tlEditorChanged()" style="min-width:60px;font-size:10px">
+          <option value="ulmin" ${(ev.velUnit||'ulmin')==='ulmin'?'selected':''}>µL/min</option>
+          <option value="mls" ${ev.velUnit==='mls'?'selected':''}>mL/s</option>
+        </select>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:2px" id="tlEdCavroEst"></div>` : ''}
+    ${act==='withdraw' ? `
+      <div class="field" style="margin:0">
+        <label>From</label>
+        <input type="number" id="tlEdCavroFrom" value="${ev.fromPort||1}" min="1" max="6"
+               style="width:54px" oninput="tlEditorChanged()">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Vol mL</label>
+        <input type="number" id="tlEdCavroVol" value="${ev.volume||0.5}" min="0" step="0.01"
+               style="width:60px" oninput="tlEditorChanged()">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Outlet</label>
+        <input type="number" id="tlEdCavroOutTo" value="${ev.outToPort||3}" min="1" max="6"
+               style="width:54px" oninput="tlEditorChanged()">
       </div>
       <div class="field" style="margin:0">
         <label>Vel</label>
@@ -3200,7 +3891,8 @@ function tlOpenEditor(ev) {
                style="width:60px;${fpsWarn ? 'border-color:var(--red);color:var(--red)' : ''}" oninput="tlEditorChanged()">
         <span style="font-size:10px;color:var(--text3);margin-left:4px">${expMs ? 'max ' + maxFps : ''}</span>
       </div>
-      <div id="tlFpsWarn" style="font-size:10px;color:var(--red);margin-top:2px;${fpsWarn ? '' : 'display:none'}">${fpsWarn ? `⚠ ${curFps} fps requires <${Math.ceil(1000/curFps)}ms exposure — preset is ${expMs}ms` : ''}</div>`;
+      <div id="tlFpsWarn" style="font-size:10px;color:var(--red);margin-top:2px;${fpsWarn ? '' : 'display:none'}">${fpsWarn ? `⚠ ${curFps} fps requires <${Math.ceil(1000/curFps)}ms exposure — preset is ${expMs}ms` : ''}</div>
+      ${tlMarkerEditorHtml(ev)}`;
     } else if(ev.type === 'stack') {
       const acqObj = _loadStore("mosaic_acq_presets");
       const msObj  = _loadStore("mosaic_ms_presets");
@@ -3232,7 +3924,8 @@ function tlOpenEditor(ev) {
           </select>
           <button class="btn btn-sm accent" onclick="tlStackChAdd()">Add</button>
         </div>
-      </div>`;
+      </div>
+      ${tlMarkerEditorHtml(ev)}`;
     } else if(ev.type === 'timelapse') {
       const tlDurSec = tlTimelapseCalcDuration(ev);
       ts.innerHTML = `<div class="field" style="margin:0">
@@ -3248,9 +3941,28 @@ function tlOpenEditor(ev) {
       </div>
       <div style="font-size:10px;color:var(--text3);margin-top:2px">
         Duration: ${tlDurSec}s
-      </div>`;
+      </div>
+      ${tlMarkerEditorHtml(ev)}`;
     }
   }
+}
+
+/* Marker dropdown for timeline event editors.
+   Markers are independent of presets — flat list of all named XYZ positions. */
+function tlMarkerEditorHtml(ev) {
+  const markers = (typeof markersGetAll === 'function') ? markersGetAll() : [];
+  const opts = markers.map(m =>
+    `<option value="${m.id}" ${ev.markerRef === m.id ? 'selected' : ''}>${m.name}</option>`).join("");
+  const hasMarkers = markers.length > 0;
+  return `<div class="field" style="margin:4px 0 0 0">
+    <label>Position</label>
+    <select id="tlEdMarker" onchange="tlEditorChanged()" style="flex:1;font-size:11px"
+            ${hasMarkers ? '' : 'disabled'}>
+      <option value="">— current —</option>
+      ${opts}
+    </select>
+    <span style="font-size:10px;color:var(--text3)">${hasMarkers ? 'optional' : 'no markers set yet (use Live View)'}</span>
+  </div>`;
 }
 
 function tlStackCalcDuration(ev) {
@@ -3316,7 +4028,7 @@ function tlEditorChanged() {
     wantDur = tlStackCalcDuration(ev);
   } else if(ev.type === 'timelapse') {
     wantDur = tlTimelapseCalcDuration(ev);
-  } else if(ev.type === 'cavro' && ev.cavroAction === 'dispense') {
+  } else if(ev.type === 'cavro' && (ev.cavroAction === 'dispense' || ev.cavroAction === 'withdraw')) {
     wantDur = ev.duration;
   } else if(ev.type === 'video') {
     ev._recordDur = edDur;
@@ -3440,6 +4152,26 @@ function tlEditorChanged() {
         estEl.textContent = `~${estSec}s (${totalStrokes} stroke${totalStrokes>1?'s':''}: refill ~${Math.ceil(pullTime)}s + dispense ~${Math.ceil(pushTime)}s)`;
         estEl.style.color = '';
       }
+    } else if(ev.cavroAction === 'withdraw') {
+      const defVelMlS = 1400 / countsPerMl;
+      const vel = velMlS || defVelMlS;
+      const vol = ev.volume || 0;
+      const maxPushMlS = 5800 / countsPerMl;
+      const fullStrokes = Math.floor(vol / syr);
+      const remaining = vol % syr;
+      const totalStrokes = fullStrokes + (remaining > 0.0001 ? 1 : 0);
+      const pullTime = vol / vel;
+      const pushTime = vol / maxPushMlS;
+      const valveTime = totalStrokes * 2 * 0.25;
+      const estSec = Math.ceil(pullTime + pushTime + valveTime);
+      ev.duration = Math.max(estSec, 1);
+      ev._durUnit = 'sec';
+      document.getElementById("tlEdDurUnit").value = 'sec';
+      document.getElementById("tlEdDur").value = ev.duration;
+      if(estEl && !(velMlS && (velMlS < minMlS || velMlS > maxMlS))) {
+        estEl.textContent = `~${estSec}s (${totalStrokes} stroke${totalStrokes>1?'s':''}: pull ~${Math.ceil(pullTime)}s + push ~${Math.ceil(pushTime)}s)`;
+        estEl.style.color = '';
+      }
     }
   } else {
     if(ev.type !== 'stack') {
@@ -3471,6 +4203,12 @@ function tlEditorChanged() {
 
     const ks = document.getElementById("tlEdKeepShutter");
     if(ks) ev.keepShutterOpen = ks.checked;
+
+    const mk = document.getElementById("tlEdMarker");
+    if(mk) {
+      const v = mk.value || '';
+      ev.markerRef = v || null;
+    }
   }
 
   document.getElementById("tlEdTitle").textContent = (TL_LABELS[ev.type]||'Pump') + ': ' + ev.name;
@@ -3524,6 +4262,22 @@ async function tlApplyAcqPreset(presetName) {
   const color = acqResolveColor(a.microscopePreset, a.color);
   tasks.push(api('cam_set_pseudo_color', color));
   await Promise.all(tasks);
+}
+
+async function tlMoveToMarker(ev) {
+  if(!ev.markerRef || !scopeTiConnected) return;
+  const m = markersGet(ev.markerRef);
+  if(!m) {
+    logMsg(`Marker not found: ${ev.markerRef}`, "error");
+    return;
+  }
+  logMsg(`Moving to marker ${m.name}`, "sys");
+  try {
+    await api('ti_xy_move_abs', m.x_nm, m.y_nm);
+    await api('ti_z_move_abs',  m.z_nm);
+  } catch(e) {
+    logMsg(`Marker move failed: ${e.message}`, "error");
+  }
 }
 
 async function tlApplyPresets(ev) {
@@ -3594,6 +4348,11 @@ async function tlRunCycle(sorted, progress) {
           if(act === 'dispense') {
             logMsg(`Cavro C${ci}: dispense ${ev.volume||0.5} mL ${ev.fromPort||1}→${ev.toPort||2}`, "exp");
             await api('cavro_dispense', ci, ev.volume||0.5, ev.fromPort||1, ev.toPort||2, vel);
+          } else if(act === 'withdraw') {
+            const wVol = ev.volume || 0.5;
+            const outlet = ev.outToPort || 3;
+            logMsg(`Cavro C${ci}: withdraw ${wVol} mL from port ${ev.fromPort||1} → port ${outlet}`, "exp");
+            await api('cavro_withdraw', ci, wVol, ev.fromPort||1, vel, outlet);
           } else if(act === 'continuous') {
             await api('cavro_continuous_start', ci, ev.fromPort||1, ev.toPort||2, vel, 0);
             const durMs = (ev.duration || 60) * 1000;
@@ -3620,6 +4379,7 @@ async function tlRunCycle(sorted, progress) {
           }
         } else {
           await tlApplyPresets(ev);
+          await tlMoveToMarker(ev);
           await tlSleep(500);
           if(ev.type === 'video') {
             await api('cam_experiment_set_subdir', 'video');
@@ -3738,7 +4498,7 @@ async function tlPlay() {
   }
   if(expRes.error){ toast("Experiment folder: "+expRes.error,"error"); logMsg("Experiment folder: "+expRes.error,"error"); return; }
   logMsg("Experiment folder: "+expRes.path, "exp");
-  api('cam_experiment_set_payload', expGatherState()).catch(()=>{});
+  api('cam_experiment_set_payload', expGatherSnapshot()).catch(()=>{});
   tlRunning = true; tlAbort = false;
   document.getElementById("tlPlayBtn").disabled = true;
   document.getElementById("tlStopBtn").disabled = false;
@@ -3833,13 +4593,9 @@ function tlClearAll() {
   tlUpdateTotalTime();
   logMsg("Mosaic Control Center ready","sys");
 
-  // Show load-config dialog on startup if saved configs exist
-  try {
-    const cfgRes = await api('config_list_named');
-    if(cfgRes && cfgRes.configs && cfgRes.configs.length) {
-      _cfgShowModal(cfgRes.configs, true);
-    }
-  } catch(e) {}
+  await refreshAllModulePickers();
+  await renderConfigPanel();
+  await cfgStartupPrompt();
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════════

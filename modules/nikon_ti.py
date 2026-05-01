@@ -508,6 +508,21 @@ def ti_y_move_rel(delta_nm):
     return _wrap(y_move_relative, delta_nm)
 
 @expose
+def ti_x_move_abs(nm):
+    return _wrap(x_move_absolute, nm)
+
+@expose
+def ti_y_move_abs(nm):
+    return _wrap(y_move_absolute, nm)
+
+@expose
+def ti_xy_move_abs(x_nm, y_nm):
+    def _do():
+        x_move_absolute(x_nm)
+        y_move_absolute(y_nm)
+    return _wrap(_do)
+
+@expose
 def ti_pfs_enable():
     return _wrap(pfs_enable)
 

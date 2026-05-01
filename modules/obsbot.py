@@ -700,6 +700,40 @@ def obsbot_delete_waypoint(index):
 
 
 @expose
+def obsbot_set_waypoints(waypoints):
+    """Replace the entire waypoint list (used by config restore)."""
+    global _waypoints
+    if not isinstance(waypoints, list):
+        return {"error": "waypoints must be a list"}
+    _waypoints = [dict(wp) for wp in waypoints if isinstance(wp, dict)]
+    _save_waypoints()
+    return {"ok": True, "count": len(_waypoints)}
+
+
+@expose
+def obsbot_set_crops(crops):
+    """Replace the crop regions dict (used by config restore)."""
+    global _crops
+    if not isinstance(crops, dict):
+        return {"error": "crops must be a dict"}
+    new_crops = {"temp": None, "co2": None}
+    for k in ("temp", "co2"):
+        v = crops.get(k)
+        if v is None:
+            new_crops[k] = None
+        elif isinstance(v, (list, tuple)) and len(v) == 4:
+            try:
+                new_crops[k] = [float(v[0]), float(v[1]), float(v[2]), float(v[3])]
+            except Exception:
+                return {"error": f"Invalid crop values for '{k}'"}
+        else:
+            return {"error": f"Invalid crop for '{k}' (expected [x1,y1,x2,y2] or null)"}
+    _crops = new_crops
+    _save_crops()
+    return {"ok": True, "crops": _crops}
+
+
+@expose
 def obsbot_capture(filename=""):
     """Grab a single frame from RTSP and save to captures/obsbot/."""
     if _cam is None:

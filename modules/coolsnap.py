@@ -791,6 +791,85 @@ def stack_finish():
     return path
 
 
+def autofocus(z_range_nm=20000, steps=11, exposure_ms=None, metric="lapvar"):
+    """Image-based autofocus: scan Z, score each frame, move to best.
+
+    Snaps a frame at each of `steps` evenly-spaced Z positions across
+    ``current_z ± z_range_nm/2``, scores with the requested metric, and
+    moves the stage to the best-scoring Z.  Returns ``(best_z_nm, best_score, scores, z_positions)``.
+    """
+    import modules.nikon_ti as ti
+
+    if _hcam is None:
+        raise CamError("Camera not connected")
+    if not ti.is_connected():
+        raise CamError("Microscope not connected")
+    steps = max(3, int(steps))
+    z_range_nm = max(1000, int(z_range_nm))
+
+    if _capture_thread and _capture_thread.is_alive():
+        _capture_thread.join(timeout=10)
+
+    was_live = live_is_active()
+    if was_live:
+        live_stop()
+
+    # Save & restore exposure
+    orig_exposure = _exposure_ms
+    if exposure_ms is not None:
+        try:
+            set_exposure(int(exposure_ms))
+        except Exception:
+            pass
+
+    try:
+        center_z = ti.z_get_position()
+        half = z_range_nm // 2
+        z_positions = [int(center_z - half + i * (z_range_nm / (steps - 1)))
+                       for i in range(steps)]
+        scores = []
+        best_idx = 0
+        best_score = -1.0
+        push_event("onAutofocusProgress", 0, steps, "Starting…")
+
+        for i, z in enumerate(z_positions):
+            ti.z_move_absolute(z)
+            time.sleep(0.15)  # settle
+            frame = snap()
+            score = _af_score(frame, metric)
+            scores.append(score)
+            if score > best_score:
+                best_score = score
+                best_idx = i
+            push_event("onAutofocusProgress", i + 1, steps,
+                       f"Z={z/1000:.1f}µm  score={score:.1f}")
+
+        best_z = z_positions[best_idx]
+        ti.z_move_absolute(best_z)
+        push_event("onAutofocusComplete", best_z, best_score)
+        return best_z, best_score, scores, z_positions
+
+    finally:
+        if exposure_ms is not None:
+            try:
+                set_exposure(int(orig_exposure))
+            except Exception:
+                pass
+        if was_live:
+            live_start()
+
+
+def _af_score(frame, metric="lapvar"):
+    """Sharpness score (higher = sharper)."""
+    if metric == "lapvar" and _HAS_CV2:
+        return float(cv2.Laplacian(frame.astype(np.float32), cv2.CV_32F).var())
+    # Fallback / explicit gradient: use numpy-based gradient variance
+    f = frame.astype(np.float32)
+    gx = np.diff(f, axis=1)
+    gy = np.diff(f, axis=0)
+    return float(gx.var() + gy.var())
+
+
 def stack_capture(channels, keep_shutter_open=False):
     """Execute an entire stack acquisition server-side for speed.
 
@@ -1090,6 +1169,23 @@ def cam_stack_finish():
     try:
         path = stack_finish()
         return {"ok": True, "file": os.path.basename(path)}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@expose
+def cam_autofocus(z_range_nm=20000, steps=11, exposure_ms=None, metric="lapvar"):
+    """Image-based autofocus.  Z range in nm, steps count.  Returns best Z."""
+    try:
+        best_z, best_score, scores, z_positions = autofocus(
+            z_range_nm=int(z_range_nm),
+            steps=int(steps),
+            exposure_ms=(int(exposure_ms) if exposure_ms is not None else None),
+            metric=str(metric),
+        )
+        return {"ok": True, "best_z_nm": int(best_z), "best_score": float(best_score),
+                "scores": [float(s) for s in scores],
+                "z_positions": [int(z) for z in z_positions]}
     except Exception as e:
         return {"error": str(e)}
 
