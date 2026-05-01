@@ -28,6 +28,7 @@ _proto_threads: list = [None] * NUM_CAVRO
 _proto_stops = [threading.Event() for _ in range(NUM_CAVRO)]
 _cont_threads: list = [None] * NUM_CAVRO
 _cont_stops = [threading.Event() for _ in range(NUM_CAVRO)]
+_inlet_port: list = [1] * NUM_CAVRO  # tracks inlet (from_port) per pump for flush-on-stop
 
 
 def _patch_pump_for_concurrency(pump):
@@ -207,6 +208,7 @@ def cavro_dispense(idx, volume_ml, from_port, to_port, velocity_ml=None):
     if not _check(idx):
         return {"error": "Not connected"}
     try:
+        _inlet_port[idx] = int(from_port)
         pump = _pumps[idx]
         max_v = int(5800 / pump.velocity_scale)
         kwargs = {
@@ -255,15 +257,6 @@ def cavro_move_relative(idx, delta_ml, velocity_ml=None):
         return {"error": str(e)}
 
 
-@expose
-def cavro_switch_valve(idx, position):
-    if not _check(idx):
-        return {"error": "Not connected"}
-    try:
-        _pumps[idx].switch_valve(int(position))
-        return {"ok": True}
-    except Exception as e:
-        return {"error": str(e)}
 
 
 # ── Status / halt ────────────────────────────────────────────────────────────
@@ -279,10 +272,28 @@ def cavro_halt(idx):
         return {"error": str(e)}
 
 
+def _flush_to_inlet():
+    """Push remaining syringe contents back to each pump's inlet port."""
+    time.sleep(0.3)  # let halt settle
+    for i in range(NUM_CAVRO):
+        pump = _pumps[i]
+        if pump is None:
+            continue
+        try:
+            if pump.position_counts > 0:
+                pump.switch_valve(_inlet_port[i])
+                max_vel = int(5800 / pump.velocity_scale)
+                pump.move_absolute_counts(0, velocity_counts=max_vel, wait=True)
+        except Exception:
+            pass
+
+
 @expose
 def cavro_stop_all():
-    """Emergency stop: halt all pumps and kill all background threads."""
+    """Emergency stop: halt all pumps, kill background threads, and push
+    any remaining syringe contents back to each pump's inlet port."""
     _coord_stop.set()
+    _dualpush_stop.set()
     for i in range(NUM_CAVRO):
         _cont_stops[i].set()
         _proto_stops[i].set()
@@ -292,6 +303,7 @@ def cavro_stop_all():
                 _pumps[i].halt()
             except Exception:
                 pass
+    threading.Thread(target=_flush_to_inlet, daemon=True).start()
     return {"ok": True}
 
 
@@ -325,6 +337,7 @@ def cavro_continuous_start(idx, from_port, to_port, velocity_ml=None,
     """
     if not _check(idx):
         return {"error": "Not connected"}
+    _inlet_port[idx] = int(from_port)
     if _cont_threads[idx] and _cont_threads[idx].is_alive():
         _cont_stops[idx].set()
         try:
@@ -500,6 +513,8 @@ def cavro_coordinated_start(idx1, idx2, from1, to1, from2, to2,
     i1, i2 = int(idx1), int(idx2)
     f1, t1_ = max(1, min(6, int(from1))), max(1, min(6, int(to1)))
     f2, t2_ = max(1, min(6, int(from2))), max(1, min(6, int(to2)))
+    _inlet_port[i1] = f1
+    _inlet_port[i2] = f2
     _coord_pump_idxs = (i1, i2)
     ready = threading.Event()
     t = threading.Thread(
@@ -652,6 +667,227 @@ def _coordinated_thread(idx1, idx2, from1, to1, from2, to2, velocity_ml, ready=N
                 pass
         push_event("onCavroCoordinatedUpdate", "error",
                    f"Coordinated error: {e}")
+
+
+# ── Dual-push: two inlet pumps push, one outlet pump pulls ─────────────────
+
+_dualpush_stop = threading.Event()
+_dualpush_thread = None
+_dualpush_pump_idxs = (None, None, None)
+
+
+@expose
+def cavro_dualpush_start(idx_in1, idx_in2, idx_out,
+                         from1, to1, from2, to2, from_out, to_out,
+                         velocity_ml=None):
+    """Two pumps push in through a device while one pump pulls out.
+
+    Inlet pumps alternate so flow is nearly continuous: while one pushes
+    the other refills.  The outlet pump mirrors each push phase by pulling.
+
+    idx_in1/idx_in2: inlet pump indices (push)
+    idx_out:         outlet pump index (pull / withdraw)
+    from1/to1:       inlet pump 1 source port / device port
+    from2/to2:       inlet pump 2 source port / device port
+    from_out/to_out: outlet pump device port / waste port
+    velocity_ml:     push/pull rate in mL/s (same for all pumps in active phase)
+    """
+    global _dualpush_thread, _dualpush_pump_idxs
+    for ci in (idx_in1, idx_in2, idx_out):
+        if not _check(ci):
+            return {"error": f"Pump {ci} not connected"}
+    if _dualpush_thread and _dualpush_thread.is_alive():
+        _dualpush_stop.set()
+        for ci in _dualpush_pump_idxs:
+            if ci is not None and _check(ci):
+                try:
+                    _pumps[ci].halt()
+                except Exception:
+                    pass
+        _dualpush_thread.join(timeout=60)
+    _dualpush_stop.clear()
+    i1, i2, io = int(idx_in1), int(idx_in2), int(idx_out)
+    f1  = max(1, min(6, int(from1)))
+    t1_ = max(1, min(6, int(to1)))
+    f2  = max(1, min(6, int(from2)))
+    t2_ = max(1, min(6, int(to2)))
+    fo  = max(1, min(6, int(from_out)))
+    to_ = max(1, min(6, int(to_out)))
+    _inlet_port[i1] = f1
+    _inlet_port[i2] = f2
+    _inlet_port[io] = fo
+    _dualpush_pump_idxs = (i1, i2, io)
+    ready = threading.Event()
+    t = threading.Thread(
+        target=_dualpush_thread_fn,
+        args=(i1, i2, io, f1, t1_, f2, t2_, fo, to_,
+              float(velocity_ml) if velocity_ml is not None else None,
+              ready),
+        daemon=True,
+    )
+    _dualpush_thread = t
+    t.start()
+    ready.wait(timeout=30)
+    return {"ok": True}
+
+
+@expose
+def cavro_dualpush_stop():
+    """Stop dual-push pumping and wait for flush to complete."""
+    global _dualpush_thread
+    _dualpush_stop.set()
+    for ci in _dualpush_pump_idxs:
+        if ci is not None and _check(ci):
+            try:
+                _pumps[ci].halt()
+            except Exception:
+                pass
+    if _dualpush_thread and _dualpush_thread.is_alive():
+        _dualpush_thread.join(timeout=60)
+    return {"ok": True}
+
+
+@expose
+def cavro_dualpush_is_running():
+    return _dualpush_thread is not None and _dualpush_thread.is_alive()
+
+
+def _dualpush_thread_fn(idx_in1, idx_in2, idx_out,
+                        from1, to1, from2, to2, from_out, to_out,
+                        velocity_ml, ready=None):
+    p1 = _pumps[idx_in1]
+    p2 = _pumps[idx_in2]
+    po = _pumps[idx_out]
+    syringe_ml = p1.syringe_volume_ml
+    max_v = int(5800 / p1.velocity_scale)
+    max_vel = min(p1.counts_per_stroke, max_v)
+
+    if velocity_ml:
+        push_vel = max(3, min(round(velocity_ml * p1.counts_per_ml), max_v))
+    else:
+        push_vel = max_vel
+
+    # Outlet pulls at 2x inlet speed (matching combined flow of both inlets)
+    pull_vel = min(push_vel * 2, max(3, min(
+        int(5800 / po.velocity_scale), po.counts_per_stroke)))
+
+    # Inlets fill to half — matches outlet full syringe at 2x pull speed
+    half1 = int(syringe_ml * p1.counts_per_ml) // 2
+    half2 = int(syringe_ml * p2.counts_per_ml) // 2
+    full_o = int(syringe_ml * po.counts_per_ml)
+    half_ml = syringe_ml / 2.0
+    n = 0
+
+    print(f"[Cavro DUAL] IN1=P{idx_in1+1}({from1}→{to1}) "
+          f"IN2=P{idx_in2+1}({from2}→{to2}) "
+          f"OUT=P{idx_out+1}({from_out}→{to_out}) "
+          f"vel_ml={velocity_ml} push_vel={push_vel} pull_vel={pull_vel} "
+          f"inlet_fill=half ({half_ml:.3f} mL)")
+    try:
+        push_event("onCavroCoordinatedUpdate", "started",
+                   f"Dual-push: IN P{idx_in1+1}+P{idx_in2+1} → "
+                   f"OUT P{idx_out+1}")
+
+        # Pre-fill both inlet pumps to half
+        print(f"[Cavro DUAL] pre-filling IN1+IN2 to half")
+        p1.start_batch()
+        p1.switch_valve(from1)
+        p1.move_absolute_counts(half1, velocity_counts=max_vel, wait=False)
+        p2.start_batch()
+        p2.switch_valve(from2)
+        p2.move_absolute_counts(half2, velocity_counts=max_vel, wait=False)
+        TecanCavro.broadcast_execute(p1, p2)
+        TecanCavro.wait_for_all(p1, p2)
+        print(f"[Cavro DUAL] pre-fill done")
+        if ready:
+            ready.set()
+
+        while not _dualpush_stop.is_set():
+            n += 1
+
+            # Push phase: start outlet pulling first, then broadcast
+            # both inlets together (3-pump broadcast is unreliable on
+            # RS-485, so we keep broadcast to 2 pumps max)
+            print(f"[Cavro DUAL] cycle {n} push: "
+                  f"IN1+IN2 push half @ {push_vel}, OUT pull full @ {pull_vel}")
+            po.start_batch()
+            po.switch_valve(from_out)
+            po.move_absolute_counts(full_o, velocity_counts=pull_vel, wait=False)
+            po.execute(wait=False)
+            p1.start_batch()
+            p1.switch_valve(to1)
+            p1.move_absolute_counts(0, velocity_counts=push_vel, wait=False)
+            p2.start_batch()
+            p2.switch_valve(to2)
+            p2.move_absolute_counts(0, velocity_counts=push_vel, wait=False)
+            TecanCavro.broadcast_execute(p1, p2)
+            TecanCavro.wait_for_all(p1, p2, po)
+            if _dualpush_stop.is_set():
+                break
+
+            # Refill phase: start outlet flushing first, then broadcast
+            # both inlets refilling together
+            print(f"[Cavro DUAL] cycle {n} refill: "
+                  f"IN1+IN2 refill to half, OUT flush to {to_out}")
+            po.start_batch()
+            po.switch_valve(to_out)
+            po.move_absolute_counts(0, velocity_counts=max_vel, wait=False)
+            po.execute(wait=False)
+            p1.start_batch()
+            p1.switch_valve(from1)
+            p1.move_absolute_counts(half1, velocity_counts=max_vel, wait=False)
+            p2.start_batch()
+            p2.switch_valve(from2)
+            p2.move_absolute_counts(half2, velocity_counts=max_vel, wait=False)
+            TecanCavro.broadcast_execute(p1, p2)
+            TecanCavro.wait_for_all(p1, p2, po)
+            if _dualpush_stop.is_set():
+                break
+
+            total = n * 2 * half_ml
+            push_event("onCavroCoordinatedUpdate", "running",
+                       f"Cycle {n} — {total:.2f} mL pushed")
+
+        # Final flush: outlet first, then broadcast inlets (max 2)
+        if po.volume_ml > 0.001:
+            print(f"[Cavro DUAL] final flush OUT P{idx_out+1}: "
+                  f"{po.volume_ml:.3f} mL to port {to_out}")
+            po.start_batch()
+            po.switch_valve(to_out)
+            po.move_absolute_counts(0, velocity_counts=max_vel, wait=False)
+            po.execute(wait=False)
+        inlet_flush = []
+        for p, port, label in [(p1, from1, f"IN1 P{idx_in1+1}"),
+                                (p2, from2, f"IN2 P{idx_in2+1}")]:
+            if p.volume_ml > 0.001:
+                print(f"[Cavro DUAL] final flush {label}: "
+                      f"{p.volume_ml:.3f} mL to port {port}")
+                p.start_batch()
+                p.switch_valve(port)
+                p.move_absolute_counts(0, velocity_counts=max_vel, wait=False)
+                inlet_flush.append(p)
+        if inlet_flush:
+            TecanCavro.broadcast_execute(*inlet_flush)
+        TecanCavro.wait_for_all(*inlet_flush, po)
+        print(f"[Cavro DUAL] final flush done")
+
+        status = "stopped" if _dualpush_stop.is_set() else "complete"
+        total = n * 2 * half_ml
+        push_event("onCavroCoordinatedUpdate", status,
+                   f"Dual-push {status}: {n} cycles, {total:.2f} mL")
+    except Exception as e:
+        import traceback
+        print(f"[Cavro DUAL] ERROR: {e}")
+        traceback.print_exc()
+        if ready:
+            ready.set()
+        for p in (p1, p2, po):
+            try:
+                p.halt()
+            except Exception:
+                pass
+        push_event("onCavroCoordinatedUpdate", "error",
+                   f"Dual-push error: {e}")
 
 
 # ── Protocol execution ──────────────────────────────────────────────────────

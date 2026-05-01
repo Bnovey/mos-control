@@ -82,6 +82,8 @@ _disp_mode = "auto"
 _disp_vmin = 0.0
 _disp_vmax = 65535.0
 _disp_gamma = 1.0         # gamma correction: >1 darkens midtones, <1 brightens
+_disp_brightness = 0      # -100 to 100, applied as offset after stretch
+_disp_contrast = 0        # -100 to 100, applied as gain after stretch
 _DISP_EMA_ALPHA = 0.25    # smoothing factor: lower = more stable, higher = more responsive
 _DISP_LO_PCT = 1.0        # low percentile for auto-stretch
 _DISP_HI_PCT = 99.0       # high percentile for auto-stretch
@@ -176,6 +178,12 @@ def _normalize_u8(frame, max_dim=_LIVE_PREVIEW_DIM):
     gamma = _disp_gamma
     if gamma != 1.0:
         u8 = _get_gamma_lut(gamma)[u8]
+
+    b, c = _disp_brightness, _disp_contrast
+    if b != 0 or c != 0:
+        gain = 1.0 + c / 100.0
+        offset = b * 2.55
+        u8 = np.clip(u8.astype(np.float32) * gain + offset, 0, 255).astype(np.uint8)
 
     pc = _pseudo_color
     if pc is not None:
@@ -1363,9 +1371,12 @@ def cam_npy_auto_adjust(filename, frame_idx=0, subdir=None):
 
 
 @expose
-def cam_npy_histogram(filename, frame_idx=0, bins=256):
+def cam_npy_histogram(filename, frame_idx=0, bins=256, subdir=None):
     """Return histogram data for a frame in an image file."""
-    path = os.path.join(os.path.normpath(_save_dir), filename)
+    base = os.path.normpath(_base_save_dir) if subdir else os.path.normpath(_save_dir)
+    if subdir:
+        base = os.path.join(base, subdir)
+    path = os.path.join(base, filename)
     if not os.path.isfile(path):
         return {"error": f"File not found: {filename}"}
     try:
@@ -1770,6 +1781,33 @@ def cam_set_gamma(gamma):
 @expose
 def cam_get_gamma():
     return {"gamma": _disp_gamma}
+
+
+@expose
+def cam_set_brightness(val):
+    global _disp_brightness
+    _disp_brightness = max(-100, min(100, int(val)))
+    return {"brightness": _disp_brightness}
+
+
+@expose
+def cam_set_contrast(val):
+    global _disp_contrast
+    _disp_contrast = max(-100, min(100, int(val)))
+    return {"contrast": _disp_contrast}
+
+
+@expose
+def cam_reset_display():
+    """Reset brightness, contrast, and gamma to defaults."""
+    global _disp_brightness, _disp_contrast, _disp_gamma, _disp_mode, _disp_vmin, _disp_vmax
+    _disp_brightness = 0
+    _disp_contrast = 0
+    _disp_gamma = 1.0
+    _disp_mode = "auto"
+    _disp_vmin = 0.0
+    _disp_vmax = 65535.0
+    return {"brightness": 0, "contrast": 0, "gamma": 1.0}
 
 
 @expose

@@ -258,11 +258,12 @@ option { background:#fff; }
 .tl-ev-cavro { background:#0891b2; }
 
 .tl-lane-row { position:relative; display:flex; align-items:center; }
-.tl-lane-actions { position:absolute; right:4px; top:50%; transform:translateY(-50%);
-                   z-index:3; display:flex; gap:2px; }
+.tl-lane-actions { position:absolute; left:0; top:50%; transform:translateY(-50%);
+                   z-index:4; display:flex; gap:0; width:14px; justify-content:center; }
 .tl-lane-actions button { background:none; border:none; cursor:pointer; color:var(--text3);
-                          font-size:14px; line-height:1; padding:2px; }
+                          font-size:12px; line-height:1; padding:0; }
 .tl-lane-actions button:hover { color:var(--red); }
+.tl-lane-actions + .tl-lane-label { left:14px; width:42px; }
 
 .tl-playhead { position:absolute; top:0; bottom:0; width:2px; background:var(--red);
                z-index:4; pointer-events:none; transition:left .1s linear; }
@@ -296,6 +297,27 @@ option { background:#fff; }
 .npy-controls { display:flex; align-items:center; gap:8px; width:100%; max-width:600px; }
 .npy-controls input[type=range] { flex:1; }
 
+/* HISTOGRAM */
+.hist-wrap { position:relative; width:100%; max-width:600px; height:80px;
+             background:#111; border:1px solid var(--border); border-radius:4px;
+             cursor:crosshair; user-select:none; margin:4px 0; }
+.hist-wrap canvas { display:block; width:100%; height:100%; }
+.hist-info { position:absolute; top:3px; right:6px; font-size:9px; color:#888;
+             pointer-events:none; }
+.hist-handle { position:absolute; top:0; width:2px; height:100%; cursor:ew-resize; z-index:2; }
+.hist-handle::after { content:''; position:absolute; top:-2px; width:8px; height:8px;
+                      border-radius:50%; left:-3px; }
+.hist-handle.lo { background:var(--blue); }
+.hist-handle.lo::after { background:var(--blue); }
+.hist-handle.hi { background:var(--red); }
+.hist-handle.hi::after { background:var(--red); }
+.hist-range-label { position:absolute; bottom:2px; font-size:9px; font-weight:600;
+                    pointer-events:none; }
+.hist-range-label.lo { color:var(--blue); left:4px; }
+.hist-range-label.hi { color:var(--red); right:4px; }
+.hist-toggle { font-size:10px; color:var(--text3); cursor:pointer; user-select:none; }
+.hist-toggle:hover { color:var(--accent); }
+
 /* LOG */
 .log-container { background:var(--surface); border:1px solid var(--border);
                  padding:4px 0;
@@ -325,6 +347,21 @@ option { background:#fff; }
 .toast.error   { border-color:rgba(239,68,68,.3); color:var(--red); }
 .toast.success { border-color:rgba(16,185,129,.3);  color:var(--green); }
 @keyframes slideIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+/* Config modal */
+.cfg-overlay { position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:9000;display:flex;align-items:center;justify-content:center; }
+.cfg-modal { background:var(--bg);border:1px solid var(--border);padding:24px 28px;min-width:360px;max-width:480px;max-height:80vh;
+             display:flex;flex-direction:column;gap:14px;box-shadow:0 8px 32px rgba(0,0,0,.18); }
+.cfg-modal h3 { margin:0;font-size:15px;font-weight:600;color:var(--text); }
+.cfg-list { display:flex;flex-direction:column;gap:4px;overflow-y:auto;max-height:300px; }
+.cfg-item { display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;border:1px solid var(--border);font-size:12px;transition:background .15s; }
+.cfg-item:hover { background:var(--bg2); }
+.cfg-item.selected { border-color:var(--blue);background:rgba(59,130,246,.06); }
+.cfg-item .cfg-name { font-weight:600;flex:1; }
+.cfg-item .cfg-date { color:var(--text3);font-size:11px; }
+.cfg-item .cfg-del { color:var(--red);cursor:pointer;font-size:14px;padding:0 4px;opacity:.6; }
+.cfg-item .cfg-del:hover { opacity:1; }
+.cfg-btns { display:flex;gap:8px;justify-content:flex-end; }
 </style>
 </head>
 <body>
@@ -627,7 +664,17 @@ option { background:#fff; }
                   <option value="4">4×</option>
                   <option value="8">8×</option>
                 </select>
-                <span id="acqColorSwatch" style="display:inline-block;width:14px;height:14px;border:1px solid var(--border);border-radius:3px;vertical-align:middle;background:#888" title="Color from filter cube"></span>
+                <select id="acqColor" style="width:80px;font-size:11px" onchange="acqUpdateSwatch()">
+                  <option value="auto">Auto</option>
+                  <option value="none">Gray</option>
+                  <option value="blue">Blue</option>
+                  <option value="green">Green</option>
+                  <option value="red">Red</option>
+                  <option value="cyan">Cyan</option>
+                  <option value="magenta">Magenta</option>
+                  <option value="yellow">Yellow</option>
+                </select>
+                <span id="acqColorSwatch" style="display:inline-block;width:14px;height:14px;border:1px solid var(--border);border-radius:3px;vertical-align:middle;background:#888"></span>
                 <button class="btn btn-sm accent" onclick="acqSavePreset()">Save</button>
               </div>
               <div class="preset-list" id="acqPresetList"></div>
@@ -643,11 +690,10 @@ option { background:#fff; }
           <div class="live-preview" id="livePreviewArea">
             <img id="scopePreview" alt="preview">
             <div class="live-placeholder" id="scopePlaceholder">
-              Connect camera and click <strong>Live</strong> or <strong>Snap</strong>
+              Connect camera and click <strong>Live</strong>
             </div>
             <div class="live-fps" id="scopeFps"></div>
             <div class="live-overlay">
-              <button class="btn btn-sm blue" onclick="scopeSnap()">Snap</button>
               <button class="btn btn-sm" id="scopeLiveBtn" onclick="scopeToggleLive()">Live</button>
               <button class="btn btn-sm" onclick="scopeSnapSave()">Save</button>
             </div>
@@ -663,29 +709,41 @@ option { background:#fff; }
             <div style="flex:1"></div>
             <div class="proto-status" id="scopeCamStatus"></div>
           </div>
-          <div class="live-quick" style="gap:6px;align-items:center">
-            <label style="font-size:11px;color:var(--text3)">Display:</label>
-            <button class="btn btn-sm green" id="dispAutoBtn" onclick="dispSetMode('auto')">Auto</button>
-            <button class="btn btn-sm" id="dispLockBtn" onclick="dispLock()">Lock</button>
-            <span style="font-size:10px;color:var(--text3);margin-left:4px">Min</span>
-            <input type="range" id="dispMinSlider" min="0" max="65535" value="0" step="10"
-                   style="width:80px;accent-color:var(--blue)"
-                   oninput="dispSliderChanged()"
-                   onchange="dispSliderChanged()">
-            <span id="dispMinVal" style="font-size:10px;min-width:36px">0</span>
-            <span style="font-size:10px;color:var(--text3)">Max</span>
-            <input type="range" id="dispMaxSlider" min="0" max="65535" value="65535" step="10"
-                   style="width:80px;accent-color:var(--blue)"
-                   oninput="dispSliderChanged()"
-                   onchange="dispSliderChanged()">
-            <span id="dispMaxVal" style="font-size:10px;min-width:36px">65535</span>
-            <button class="btn btn-sm" onclick="dispReset()" title="Reset to full range">Full</button>
-            <span style="font-size:10px;color:var(--text3);margin-left:6px">&#947;</span>
+          <div class="live-quick" style="gap:8px;align-items:center">
+            <span style="font-size:10px;color:var(--text3)">Brightness</span>
+            <input type="range" id="dispBrightness" min="-100" max="100" value="0" step="1"
+                   style="width:90px" oninput="dispBcgChanged()" onchange="dispBcgChanged()">
+            <span id="dispBrightVal" style="font-size:10px;min-width:24px;text-align:right">0</span>
+            <span style="font-size:10px;color:var(--text3);margin-left:4px">Contrast</span>
+            <input type="range" id="dispContrast" min="-100" max="100" value="0" step="1"
+                   style="width:90px" oninput="dispBcgChanged()" onchange="dispBcgChanged()">
+            <span id="dispContrastVal" style="font-size:10px;min-width:24px;text-align:right">0</span>
+            <span style="font-size:10px;color:var(--text3);margin-left:4px">Gamma</span>
             <input type="range" id="dispGammaSlider" min="0.2" max="5.0" value="1.0" step="0.1"
-                   style="width:70px;accent-color:var(--orange)"
-                   oninput="dispGammaChanged()"
-                   onchange="dispGammaChanged()">
-            <span id="dispGammaVal" style="font-size:10px;min-width:24px">1.0</span>
+                   style="width:80px" oninput="dispBcgChanged()" onchange="dispBcgChanged()">
+            <span id="dispGammaVal" style="font-size:10px;min-width:24px;text-align:right">1.0</span>
+            <button class="btn btn-sm" onclick="dispAutoAdjust()" title="Auto-adjust brightness and contrast">Auto</button>
+            <button class="btn btn-sm" onclick="dispResetAll()" title="Reset to defaults">Reset</button>
+            <span class="hist-toggle" onclick="liveHistToggle()" id="liveHistToggleLabel">&#9660; Histogram</span>
+          </div>
+          <div id="liveHistContainer" style="display:none;padding:0 0 4px 0">
+            <div class="hist-wrap" id="liveHistWrap">
+              <canvas id="liveHistCanvas"></canvas>
+              <div class="hist-handle lo" id="liveHistLo"></div>
+              <div class="hist-handle hi" id="liveHistHi"></div>
+              <div class="hist-info" id="liveHistInfo"></div>
+              <div class="hist-range-label lo" id="liveHistLoLabel"></div>
+              <div class="hist-range-label hi" id="liveHistHiLabel"></div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:2px">
+              <label style="font-size:10px;color:var(--text3)">Min:</label>
+              <input type="number" id="liveHistMinInput" style="width:60px;font-size:11px"
+                     onchange="liveHistRangeTyped()">
+              <label style="font-size:10px;color:var(--text3)">Max:</label>
+              <input type="number" id="liveHistMaxInput" style="width:60px;font-size:11px"
+                     onchange="liveHistRangeTyped()">
+              <span style="font-size:10px;color:var(--text3)" id="liveHistModeLabel"></span>
+            </div>
           </div>
           <div class="filmstrip" id="liveFilmstrip">
             <div style="color:var(--text3);font-size:11px;padding:4px">No captures yet</div>
@@ -699,12 +757,8 @@ option { background:#fff; }
           <div class="panel-title" style="margin-bottom:0">Experiment:</div>
           <input type="text" id="tlExpName" placeholder="enter experiment name"
                  style="flex:1;max-width:300px;font-size:16px;font-weight:600;padding:6px 10px">
-          <button class="btn btn-sm" onclick="expSave()" title="Save experiment to server">Save</button>
-          <select id="expSavedList" style="min-width:120px;font-size:11px"
-                  onchange="expLoadSelected()">
-            <option value="">Load saved...</option>
-          </select>
-          <button class="btn btn-sm red" onclick="expDeleteSelected()" title="Delete selected experiment">&times;</button>
+          <button class="btn btn-sm blue" onclick="cfgSave()" title="Save all presets, timeline, and pump settings">Save Config</button>
+          <button class="btn btn-sm" onclick="cfgShowLoad()" title="Load a saved configuration">Load Config</button>
           <button class="btn btn-sm" onclick="tlClearAll()" title="Clear all events and lanes" style="margin-left:8px">Clear All</button>
         </div>
         <div class="tl-layout">
@@ -732,7 +786,7 @@ option { background:#fff; }
             <div class="sep"></div>
             <label style="font-size:11px;font-weight:600;color:var(--text2)">Zoom</label>
             <input type="range" id="tlZoom" min="0" max="100" value="30"
-                   style="width:100px;accent-color:var(--accent)" oninput="tlRender()">
+                   style="width:100px;accent-color:var(--accent)" oninput="tlZoomChanged()">
             <label style="font-size:11px;font-weight:600;color:var(--text2)">Cycle</label>
             <input type="number" id="tlDuration" value="60" min="1" step="1" style="width:55px"
                    onchange="tlRender();tlUpdateTotalTime()">
@@ -876,6 +930,10 @@ option { background:#fff; }
                 <button class="btn btn-sm" onclick="npyBcgReset()">Reset</button>
                 <button class="btn btn-sm" id="npyStackBtn" style="display:none;background:#8b5cf6;border-color:#8b5cf6;color:#fff" onclick="npyStackFrames()">Stack All</button>
                 <button class="btn btn-sm" id="npyMergeBtn" style="display:none;background:#8b5cf6;border-color:#8b5cf6;color:#fff" onclick="npyMergeChannels()">Merge Channels</button>
+              </div>
+              <div class="hist-wrap" id="npyHistWrap" style="margin-top:6px">
+                <canvas id="npyHistCanvas"></canvas>
+                <div class="hist-info" id="npyHistInfo"></div>
               </div>
             </div>
             <!-- Per-channel merge controls (stack merge mode) -->
@@ -1121,9 +1179,11 @@ function updateIndicators() {
 function logMsg(msg, badge="sys") {
   const c = document.getElementById("logContainer");
   document.getElementById("logEmpty")?.remove();
+  const css = badge === "error" ? "err" : badge;
+  const label = badge === "error" ? "error" : badge;
   const e = document.createElement("div"); e.className="log-entry";
   e.innerHTML = `<span class="log-time">${now()}</span>`
-    + `<span class="log-badge ${badge}">${badge}</span>`
+    + `<span class="log-badge ${css}">${label}</span>`
     + `<span class="log-msg">${msg}</span>`;
   c.appendChild(e);
   c.scrollTop = c.scrollHeight;
@@ -1138,7 +1198,7 @@ function clearLog() {
    ═══════════════════════════════════════════════════════════════════════════ */
 async function refreshPorts() {
   let res = await api('pump_get_ports');
-  if(res.error){ toast(res.error,"error"); return; }
+  if(res.error){ toast(res.error,"error"); logMsg("Ports refresh: "+res.error,"error"); return; }
   portList = res;
   let names = res.map(p=>p.device);
   for(let i=0;i<NUM_PUMPS;i++){
@@ -1155,6 +1215,7 @@ async function refreshPorts() {
     if(cur && names.includes(cur)) cSel.value = cur;
   }
   toast("Ports refreshed ("+names.length+")","success");
+  logMsg("Ports refreshed ("+names.length+")","sys");
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1245,7 +1306,7 @@ async function pumpConnect(i) {
   const addr = document.getElementById("addr"+i).value;
   if(!port){ toast("Select a port","error"); return; }
   const res = await api('pump_connect', i, port, parseInt(addr));
-  if(res.error){ toast("P"+i+": "+res.error,"error"); return; }
+  if(res.error){ toast("P"+i+": "+res.error,"error"); logMsg("P"+i+": "+res.error,"error"); return; }
   pumpState[i].connected = true;
   document.getElementById("pump"+i).classList.add("connected");
   document.getElementById("pBadge"+i).className="badge on";
@@ -1266,41 +1327,42 @@ async function pumpDisconnect(i) {
   document.getElementById("pDisc"+i).disabled=true;
   updateIndicators();
   toast("P"+i+" disconnected");
+  logMsg("P"+i+" disconnected","pump");
 }
 async function pumpSetDia(i) {
   const v=document.getElementById("dia"+i).value;
   const r=await api('pump_set_diameter', i, parseFloat(v));
-  if(r.error) toast("P"+i+": "+r.error,"error");
-  else toast("P"+i+": diameter set","success");
+  if(r.error) { toast("P"+i+": "+r.error,"error"); logMsg("P"+i+" set diameter: "+r.error,"error"); }
+  else { toast("P"+i+": diameter set","success"); logMsg("P"+i+" diameter set to "+v,"pump"); }
 }
 async function pumpSetDir(i) {
   const v=document.getElementById("dir"+i).value;
   const r=await api('pump_set_direction', i, v);
-  if(r.error) toast("P"+i+": "+r.error,"error");
-  else toast("P"+i+": direction="+v,"success");
+  if(r.error) { toast("P"+i+": "+r.error,"error"); logMsg("P"+i+" set direction: "+r.error,"error"); }
+  else { toast("P"+i+": direction="+v,"success"); logMsg("P"+i+" direction set to "+v,"pump"); }
 }
 async function pumpSetRate(i) {
   const rate=document.getElementById("rate"+i).value;
   const u=document.getElementById("rateU"+i).value;
   const r=await api('pump_set_rate', i, parseFloat(rate), u);
-  if(r.error) toast("P"+i+": "+r.error,"error");
-  else toast("P"+i+": rate set","success");
+  if(r.error) { toast("P"+i+": "+r.error,"error"); logMsg("P"+i+" set rate: "+r.error,"error"); }
+  else { toast("P"+i+": rate set","success"); logMsg("P"+i+" rate set to "+rate+" "+u,"pump"); }
 }
 async function pumpSetVol(i) {
   const v=document.getElementById("vol"+i).value;
   const r=await api('pump_set_volume', i, parseFloat(v));
-  if(r.error) toast("P"+i+": "+r.error,"error");
-  else toast("P"+i+": volume set","success");
+  if(r.error) { toast("P"+i+": "+r.error,"error"); logMsg("P"+i+" set volume: "+r.error,"error"); }
+  else { toast("P"+i+": volume set","success"); logMsg("P"+i+" volume set to "+v,"pump"); }
 }
 async function pumpRun(i) {
   const r=await api('pump_run', i);
-  if(r.error) toast("P"+i+": "+r.error,"error");
-  else toast("P"+i+": running","success");
+  if(r.error) { toast("P"+i+": "+r.error,"error"); logMsg("P"+i+" run: "+r.error,"error"); }
+  else { toast("P"+i+": running","success"); logMsg("P"+i+" started running","pump"); }
 }
 async function pumpStop(i) {
   const r=await api('pump_stop', i);
-  if(r.error) toast("P"+i+": "+r.error,"error");
-  else toast("P"+i+": stopped");
+  if(r.error) { toast("P"+i+": "+r.error,"error"); logMsg("P"+i+" stop: "+r.error,"error"); }
+  else { toast("P"+i+": stopped"); logMsg("P"+i+" stopped","pump"); }
 }
 async function pumpClrVol(i) { await api('pump_clear_volume', i); }
 async function pumpClrTgt(i) { await api('pump_clear_target', i); }
@@ -1341,21 +1403,24 @@ async function protoRun(i) {
   if(!pumpState[i].connected){ toast("Connect pump first","error"); return; }
   if(!pumpState[i].steps.length){ toast("Protocol empty","error"); return; }
   const r=await api('pump_run_protocol', i, pumpState[i].steps);
-  if(r.error){ toast("P"+i+": "+r.error,"error"); return; }
+  if(r.error){ toast("P"+i+": "+r.error,"error"); logMsg("P"+i+" protocol: "+r.error,"error"); return; }
   pumpState[i].protoRunning=true;
   document.getElementById("protoRun"+i).disabled=true;
   document.getElementById("protoStop"+i).disabled=false;
+  logMsg("P"+i+" protocol started ("+pumpState[i].steps.length+" steps)","pump");
 }
 async function protoStop(i) {
   await api('pump_stop_protocol', i);
   pumpState[i].protoRunning=false;
   document.getElementById("protoRun"+i).disabled=false;
   document.getElementById("protoStop"+i).disabled=true;
+  logMsg("P"+i+" protocol stopped","pump");
 }
 
 /* pump event handlers */
 onEvent("onPumpProtocolUpdate", function(idx, step, status, msg) {
   document.getElementById("protoStat"+idx).textContent=msg;
+  logMsg("P"+idx+": "+msg, status==="error"?"error":"pump");
   if(status==="complete"||status==="aborted"||status==="error") {
     pumpState[idx].protoRunning=false;
     document.getElementById("protoRun"+idx).disabled=false;
@@ -1379,10 +1444,10 @@ async function cavroConnectBus() {
   const vlv  = parseInt(document.getElementById("cavroValves").value);
   const addrStr = document.getElementById("cavroAddresses").value.trim();
   const addrs = addrStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-  if(!port){ toast("Select a port","error"); return; }
-  if(addrs.length !== 4){ toast("Enter exactly 4 comma-separated addresses","error"); return; }
+  if(!port){ toast("Select a port","error"); logMsg("Cavro: no port selected","error"); return; }
+  if(addrs.length !== 4){ toast("Enter exactly 4 comma-separated addresses","error"); logMsg("Cavro: invalid addresses","error"); return; }
   const r = await api('cavro_connect_bus', port, syr, vlv, addrs);
-  if(r.error){ toast("Cavro: "+r.error,"error"); return; }
+  if(r.error){ toast("Cavro: "+r.error,"error"); logMsg("Cavro connect: "+r.error,"error"); return; }
   cavroBusConnected = true;
   document.getElementById("cavroBusBadge").className="badge on";
   document.getElementById("cavroBusBadge").textContent="Online";
@@ -1403,12 +1468,15 @@ async function cavroDisconnectBus() {
   document.getElementById("cavroBusDisc").disabled=true;
   for(let i=0;i<NUM_CAVRO;i++) document.getElementById("cStatus"+i).textContent="—";
   updateIndicators();
+  logMsg("Cavro bus disconnected","sys");
 }
 
 async function cavroStopAll() {
   toast("Stopping all pumps...");
+  logMsg("Cavro: stopping all pumps","sys");
   await api('cavro_stop_all');
   toast("All pumps stopped","success");
+  logMsg("Cavro: all pumps stopped","sys");
   cavroRefreshAllStatus();
 }
 
@@ -1416,17 +1484,19 @@ async function cavroStopAll() {
 async function cavroHome(i) {
   if(!cavroBusConnected){ toast("Connect bus first","error"); return; }
   toast("Homing Cavro "+i+"...");
+  logMsg("Cavro C"+i+": homing","sys");
   const r = await api('cavro_home', i);
-  if(r.error) toast("C"+i+": "+r.error,"error");
-  else { toast("C"+i+" homed","success"); cavroRefreshAllStatus(); }
+  if(r.error) { toast("C"+i+": "+r.error,"error"); logMsg("Cavro C"+i+" home: "+r.error,"error"); }
+  else { toast("C"+i+" homed","success"); logMsg("Cavro C"+i+": homed","sys"); cavroRefreshAllStatus(); }
 }
 
 async function cavroHomeAll() {
   if(!cavroBusConnected){ toast("Connect bus first","error"); return; }
   toast("Homing all Cavro pumps...");
+  logMsg("Cavro: homing all pumps","sys");
   const r = await api('cavro_home_all');
-  if(r.error) toast("Cavro: "+r.error,"error");
-  else { toast("All Cavro pumps homed","success"); cavroRefreshAllStatus(); }
+  if(r.error) { toast("Cavro: "+r.error,"error"); logMsg("Cavro home all: "+r.error,"error"); }
+  else { toast("All Cavro pumps homed","success"); logMsg("Cavro: all pumps homed","sys"); cavroRefreshAllStatus(); }
 }
 
 /* ── Status ───────────────────────────────────────────────────────────────── */
@@ -1445,7 +1515,13 @@ async function cavroRefreshAllStatus() {
 
 /* ── Cavro event handlers (for timeline-triggered operations) ─────────────── */
 onEvent("onCavroContinuousUpdate", function(idx, status, msg) {
-  logMsg("C"+idx+": "+msg, "sys");
+  logMsg("Cavro C"+idx+": "+msg, status==="error"?"error":"sys");
+});
+onEvent("onCavroCoordinatedUpdate", function(status, msg) {
+  logMsg("Cavro coord: "+msg, status==="error"?"error":"sys");
+});
+onEvent("onCavroProtocolUpdate", function(idx, step, status, msg) {
+  logMsg("Cavro C"+idx+": "+msg, status==="error"?"error":"sys");
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1453,7 +1529,7 @@ onEvent("onCavroContinuousUpdate", function(idx, status, msg) {
    ═══════════════════════════════════════════════════════════════════════════ */
 async function scopeTiConnect() {
   const r = await api('ti_connect');
-  if(r.error){ toast("Ti: "+r.error,"error"); return; }
+  if(r.error){ toast("Ti: "+r.error,"error"); logMsg("Nikon Ti connect: "+r.error,"error"); return; }
   scopeTiConnected = true;
   document.getElementById("scopeTiBadge").className="badge on";
   document.getElementById("scopeTiBadge").textContent="Online";
@@ -1472,19 +1548,20 @@ async function scopeTiDisconnect() {
   document.getElementById("scopeTiConn").disabled=false;
   document.getElementById("scopeTiDisc").disabled=true;
   updateIndicators();
+  logMsg("Nikon Ti disconnected","sys");
 }
 
 async function scopeShutterOpen() {
   if(!scopeTiConnected){ toast("Connect Ti first","error"); return; }
   const r = await api('ti_shutter_open');
-  if(r.error) toast(r.error,"error");
-  else { _shutterOpen=true; updateShutterBadge(); }
+  if(r.error) { toast(r.error,"error"); logMsg("Shutter open: "+r.error,"error"); }
+  else { _shutterOpen=true; updateShutterBadge(); logMsg("DIA shutter opened","sys"); }
 }
 async function scopeShutterClose() {
   if(!scopeTiConnected){ toast("Connect Ti first","error"); return; }
   const r = await api('ti_shutter_close');
-  if(r.error) toast(r.error,"error");
-  else { _shutterOpen=false; updateShutterBadge(); }
+  if(r.error) { toast(r.error,"error"); logMsg("Shutter close: "+r.error,"error"); }
+  else { _shutterOpen=false; updateShutterBadge(); logMsg("DIA shutter closed","sys"); }
 }
 function updateShutterBadge() {
   document.getElementById("scopeShutterBadge").className = _shutterOpen ? "badge on" : "badge";
@@ -1495,12 +1572,14 @@ function updateShutterBadge() {
 async function scopeLampOn() {
   if(!scopeTiConnected){ toast("Connect Ti first","error"); return; }
   const r = await api('ti_dia_lamp_on');
-  if(!r.error){ _lampOn=true; updateLampBadge(); }
+  if(r.error) { logMsg("Lamp on: "+r.error,"error"); }
+  else { _lampOn=true; updateLampBadge(); logMsg("DIA lamp on","sys"); }
 }
 async function scopeLampOff() {
   if(!scopeTiConnected){ toast("Connect Ti first","error"); return; }
   const r = await api('ti_dia_lamp_off');
-  if(!r.error){ _lampOn=false; updateLampBadge(); }
+  if(r.error) { logMsg("Lamp off: "+r.error,"error"); }
+  else { _lampOn=false; updateLampBadge(); logMsg("DIA lamp off","sys"); }
 }
 function updateLampBadge() {
   document.getElementById("scopeLampBadge").className = _lampOn ? "badge on" : "badge";
@@ -1516,7 +1595,7 @@ async function scopeLampSetIntensity(v) {
 async function ilConnect() {
   const port = document.getElementById("ilPort").value.trim() || "COM6";
   const r = await api('il_connect', port);
-  if(r.error){ toast("Intensilight: "+r.error,"error"); return; }
+  if(r.error){ toast("Intensilight: "+r.error,"error"); logMsg("Intensilight connect: "+r.error,"error"); return; }
   _ilConnected = true;
   document.getElementById("cardIntensi").classList.add("connected");
   document.getElementById("scopeIntensiBadge").className="badge on";
@@ -1540,25 +1619,26 @@ async function ilDisconnect() {
   document.getElementById("ilNdState").textContent="-";
   updateIndicators();
   updateIntensiBadge();
+  logMsg("Intensilight disconnected","sys");
 }
 async function ilShutterOpen() {
   if(!_ilConnected){ toast("Connect Intensilight first","error"); return; }
   const r = await api('il_shutter_open');
-  if(r.error) toast(r.error,"error");
-  else { _intensiOn=true; updateIntensiBadge(); document.getElementById("ilShutterState").textContent="Open"; }
+  if(r.error) { toast(r.error,"error"); logMsg("IL shutter open: "+r.error,"error"); }
+  else { _intensiOn=true; updateIntensiBadge(); document.getElementById("ilShutterState").textContent="Open"; logMsg("IL shutter opened","sys"); }
 }
 async function ilShutterClose() {
   if(!_ilConnected){ toast("Connect Intensilight first","error"); return; }
   const r = await api('il_shutter_close');
-  if(r.error) toast(r.error,"error");
-  else { _intensiOn=false; updateIntensiBadge(); document.getElementById("ilShutterState").textContent="Closed"; }
+  if(r.error) { toast(r.error,"error"); logMsg("IL shutter close: "+r.error,"error"); }
+  else { _intensiOn=false; updateIntensiBadge(); document.getElementById("ilShutterState").textContent="Closed"; logMsg("IL shutter closed","sys"); }
 }
 async function ilNdSet() {
   if(!_ilConnected){ toast("Connect Intensilight first","error"); return; }
   const v = parseInt(document.getElementById("ilNdSelect").value);
   const r = await api('il_nd_set', v);
-  if(r.error) toast(r.error,"error");
-  else document.getElementById("ilNdState").textContent = r.label;
+  if(r.error) { toast(r.error,"error"); logMsg("IL ND set: "+r.error,"error"); }
+  else { document.getElementById("ilNdState").textContent = r.label; logMsg("IL ND filter set to "+r.label,"sys"); }
 }
 async function ilRefresh() {
   if(!_ilConnected) return;
@@ -1581,14 +1661,20 @@ function updateIntensiBadge() {
 async function scopeSetNosepiece() {
   if(!scopeTiConnected){ toast("Connect Ti first","error"); return; }
   const v = parseInt(document.getElementById("scopeNosepiece").value);
+  const _objNames = {1:'2x',2:'4x',3:'4x Fluor',4:'10x',5:'20x',6:'40x'};
+  logMsg("Objective set to "+(_objNames[v]||"pos "+v),"sys");
   const r = await api('ti_nosepiece_set', v);
-  if(!r.error) scopeRefreshOptics();
+  if(r.error) logMsg("Nosepiece: "+r.error,"error");
+  else scopeRefreshOptics();
 }
 async function scopeSetFilter() {
   if(!scopeTiConnected){ toast("Connect Ti first","error"); return; }
   const v = parseInt(document.getElementById("scopeFilter").value);
+  const _filtNames = {1:'DIA',2:'DAPI',3:'GFP',4:'TxRed'};
+  logMsg("Filter set to "+(_filtNames[v]||"pos "+v),"sys");
   const r = await api('ti_filter_set', v);
-  if(!r.error) scopeRefreshOptics();
+  if(r.error) logMsg("Filter: "+r.error,"error");
+  else scopeRefreshOptics();
 }
 async function scopeRefreshOptics() {
   const n = await api('ti_nosepiece_get');
@@ -1651,71 +1737,213 @@ function scopeSetExposureFrom(v) {
   scopeSetExposure();
 }
 
-/* Display range / auto-brightness */
-let _dispMode = "auto";
-let _dispPollTimer = null;
-
-async function dispSetMode(mode) {
-  const r = await api('cam_display_mode', mode);
-  if(r.mode) { _dispMode = r.mode; dispUpdateUI(r); }
-}
-async function dispLock() {
-  const r = await api('cam_auto_adjust');
-  if(r.mode) { _dispMode = r.mode; dispUpdateUI(r); }
-}
-async function dispReset() {
-  await api('cam_set_display_range', 0, 65535);
-  await api('cam_set_gamma', 1.0);
-  document.getElementById("dispGammaSlider").value = 1.0;
-  document.getElementById("dispGammaVal").textContent = "1.0";
-  await dispSetMode('auto');
-}
-let _dispGammaDebounce = null;
-function dispGammaChanged() {
+/* Display: brightness / contrast / gamma */
+let _dispBcgDebounce = null;
+function dispBcgChanged() {
+  const b = parseInt(document.getElementById("dispBrightness").value);
+  const c = parseInt(document.getElementById("dispContrast").value);
   const g = parseFloat(document.getElementById("dispGammaSlider").value);
+  document.getElementById("dispBrightVal").textContent = b;
+  document.getElementById("dispContrastVal").textContent = c;
   document.getElementById("dispGammaVal").textContent = g.toFixed(1);
-  clearTimeout(_dispGammaDebounce);
-  _dispGammaDebounce = setTimeout(() => api('cam_set_gamma', g), 100);
+  clearTimeout(_dispBcgDebounce);
+  _dispBcgDebounce = setTimeout(() => {
+    api('cam_set_brightness', b);
+    api('cam_set_contrast', c);
+    api('cam_set_gamma', g);
+  }, 80);
 }
-let _dispSliderDebounce = null;
-function dispSliderChanged() {
-  const lo = parseInt(document.getElementById("dispMinSlider").value);
-  const hi = parseInt(document.getElementById("dispMaxSlider").value);
-  document.getElementById("dispMinVal").textContent = lo;
-  document.getElementById("dispMaxVal").textContent = hi;
-  clearTimeout(_dispSliderDebounce);
-  _dispSliderDebounce = setTimeout(async () => {
-    const r = await api('cam_set_display_range', lo, Math.max(lo+1, hi));
-    if(r.mode) { _dispMode = r.mode; dispUpdateButtons(); }
-  }, 150);
+async function dispAutoAdjust() {
+  await api('cam_reset_display');
+  await api('cam_auto_adjust');
+  document.getElementById("dispBrightness").value = 0;
+  document.getElementById("dispContrast").value = 0;
+  document.getElementById("dispGammaSlider").value = 1.0;
+  document.getElementById("dispBrightVal").textContent = "0";
+  document.getElementById("dispContrastVal").textContent = "0";
+  document.getElementById("dispGammaVal").textContent = "1.0";
 }
-function dispUpdateUI(r) {
-  document.getElementById("dispMinSlider").value = r.vmin;
-  document.getElementById("dispMaxSlider").value = r.vmax;
-  document.getElementById("dispMinVal").textContent = r.vmin;
-  document.getElementById("dispMaxVal").textContent = r.vmax;
-  if (r.gamma !== undefined) {
-    document.getElementById("dispGammaSlider").value = r.gamma;
-    document.getElementById("dispGammaVal").textContent = r.gamma.toFixed(1);
+async function dispResetAll() {
+  await api('cam_reset_display');
+  document.getElementById("dispBrightness").value = 0;
+  document.getElementById("dispContrast").value = 0;
+  document.getElementById("dispGammaSlider").value = 1.0;
+  document.getElementById("dispBrightVal").textContent = "0";
+  document.getElementById("dispContrastVal").textContent = "0";
+  document.getElementById("dispGammaVal").textContent = "1.0";
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HISTOGRAM
+   ═══════════════════════════════════════════════════════════════════════════ */
+function _histDraw(canvas, histData, vmin, vmax) {
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
   }
-  dispUpdateButtons();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const bins = histData.hist;
+  if (!bins || !bins.length) return;
+  const dataMin = histData.min, dataMax = histData.max;
+  const range = dataMax - dataMin || 1;
+
+  const logBins = bins.map(v => Math.log1p(v));
+  const maxLog = Math.max(...logBins, 1);
+
+  const pad = 1;
+  const plotW = w - pad * 2, plotH = h - pad * 2;
+  const barW = plotW / bins.length;
+
+  ctx.fillStyle = 'rgba(180,180,180,0.6)';
+  for (let i = 0; i < bins.length; i++) {
+    const bh = (logBins[i] / maxLog) * plotH;
+    ctx.fillRect(pad + i * barW, pad + plotH - bh, Math.max(barW - 0.5, 0.5), bh);
+  }
+
+  if (vmin != null && vmax != null) {
+    const loX = pad + ((vmin - dataMin) / range) * plotW;
+    const hiX = pad + ((vmax - dataMin) / range) * plotW;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(pad, pad, Math.max(loX - pad, 0), plotH);
+    ctx.fillRect(hiX, pad, Math.max(pad + plotW - hiX, 0), plotH);
+
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(loX, pad); ctx.lineTo(loX, pad + plotH); ctx.stroke();
+
+    ctx.strokeStyle = '#ef4444';
+    ctx.beginPath(); ctx.moveTo(hiX, pad); ctx.lineTo(hiX, pad + plotH); ctx.stroke();
+  }
 }
-function dispUpdateButtons() {
-  document.getElementById("dispAutoBtn").classList.toggle("green", _dispMode==="auto");
-  document.getElementById("dispLockBtn").classList.toggle("blue", _dispMode==="locked");
-  document.getElementById("dispMinSlider").disabled = _dispMode==="auto";
-  document.getElementById("dispMaxSlider").disabled = _dispMode==="auto";
+
+/* ── Live histogram ── */
+let _liveHistVisible = false, _liveHistPoller = null, _liveHistData = null;
+function liveHistToggle() {
+  _liveHistVisible = !_liveHistVisible;
+  document.getElementById('liveHistContainer').style.display = _liveHistVisible ? '' : 'none';
+  document.getElementById('liveHistToggleLabel').innerHTML =
+    (_liveHistVisible ? '&#9650;' : '&#9660;') + ' Histogram';
+  if (_liveHistVisible && scopeLiveActive) _liveHistStart();
+  else _liveHistStop();
 }
-function dispStartPolling() {
-  if(_dispPollTimer) return;
-  _dispPollTimer = setInterval(async () => {
-    if(!scopeLiveActive) return;
-    const r = await api('cam_get_display_range');
-    if(r.mode) { _dispMode = r.mode; dispUpdateUI(r); }
-  }, 1000);
+function _liveHistStart() {
+  if (_liveHistPoller) return;
+  _liveHistPoll();
+  _liveHistPoller = setInterval(_liveHistPoll, 600);
 }
-function dispStopPolling() {
-  if(_dispPollTimer) { clearInterval(_dispPollTimer); _dispPollTimer = null; }
+function _liveHistStop() {
+  if (_liveHistPoller) { clearInterval(_liveHistPoller); _liveHistPoller = null; }
+}
+async function _liveHistPoll() {
+  if (!scopeLiveActive && !scopeCamConnected) return;
+  const r = await api('cam_get_histogram', 256);
+  if (r.error) return;
+  _liveHistData = r;
+  const canvas = document.getElementById('liveHistCanvas');
+  _histDraw(canvas, r, r.vmin, r.vmax);
+
+  document.getElementById('liveHistMinInput').value = r.vmin;
+  document.getElementById('liveHistMaxInput').value = r.vmax;
+  document.getElementById('liveHistModeLabel').textContent = r.mode === 'auto' ? 'auto' : 'locked';
+  document.getElementById('liveHistLoLabel').textContent = r.vmin;
+  document.getElementById('liveHistHiLabel').textContent = r.vmax;
+  document.getElementById('liveHistInfo').textContent =
+    r.min + ' – ' + r.max + '  (' + (r.max - r.min) + ')';
+
+  _liveHistPositionHandles(r);
+}
+function _liveHistPositionHandles(r) {
+  const wrap = document.getElementById('liveHistWrap');
+  const lo = document.getElementById('liveHistLo');
+  const hi = document.getElementById('liveHistHi');
+  const range = (r.max - r.min) || 1;
+  const w = wrap.clientWidth;
+  lo.style.left = (((r.vmin - r.min) / range) * w) + 'px';
+  hi.style.left = (((r.vmax - r.min) / range) * w) + 'px';
+}
+async function liveHistRangeTyped() {
+  const vmin = parseInt(document.getElementById('liveHistMinInput').value);
+  const vmax = parseInt(document.getElementById('liveHistMaxInput').value);
+  if (isNaN(vmin) || isNaN(vmax) || vmin >= vmax) return;
+  await api('cam_set_display_range', vmin, vmax);
+}
+
+/* Draggable handles on live histogram */
+(function() {
+  let dragging = null, startX = 0, startVal = 0;
+  function onDown(which, e) {
+    if (!_liveHistData) return;
+    e.preventDefault();
+    dragging = which;
+    startX = e.clientX || e.touches[0].clientX;
+    startVal = which === 'lo' ? _liveHistData.vmin : _liveHistData.vmax;
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove);
+    document.addEventListener('touchend', onUp);
+  }
+  function onMove(e) {
+    if (!dragging || !_liveHistData) return;
+    const wrap = document.getElementById('liveHistWrap');
+    const w = wrap.clientWidth;
+    const range = (_liveHistData.max - _liveHistData.min) || 1;
+    const dx = (e.clientX || e.touches[0].clientX) - startX;
+    const dv = (dx / w) * range;
+    let newVal = Math.round(startVal + dv);
+    newVal = Math.max(_liveHistData.min, Math.min(_liveHistData.max, newVal));
+
+    if (dragging === 'lo') {
+      newVal = Math.min(newVal, _liveHistData.vmax - 1);
+      _liveHistData.vmin = newVal;
+      document.getElementById('liveHistMinInput').value = newVal;
+      document.getElementById('liveHistLoLabel').textContent = newVal;
+    } else {
+      newVal = Math.max(newVal, _liveHistData.vmin + 1);
+      _liveHistData.vmax = newVal;
+      document.getElementById('liveHistMaxInput').value = newVal;
+      document.getElementById('liveHistHiLabel').textContent = newVal;
+    }
+    _liveHistPositionHandles(_liveHistData);
+    _histDraw(document.getElementById('liveHistCanvas'),
+              _liveHistData, _liveHistData.vmin, _liveHistData.vmax);
+  }
+  function onUp() {
+    if (!dragging || !_liveHistData) { dragging = null; return; }
+    dragging = null;
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onUp);
+    api('cam_set_display_range', _liveHistData.vmin, _liveHistData.vmax);
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    const lo = document.getElementById('liveHistLo');
+    const hi = document.getElementById('liveHistHi');
+    lo.addEventListener('mousedown', e => onDown('lo', e));
+    lo.addEventListener('touchstart', e => onDown('lo', e));
+    hi.addEventListener('mousedown', e => onDown('hi', e));
+    hi.addEventListener('touchstart', e => onDown('hi', e));
+  });
+})();
+
+/* ── Viewer histogram ── */
+async function npyHistUpdate() {
+  if (!_npyCurrentFile) return;
+  const frameIdx = _npyFileTypeCache === 'stack'
+    ? parseInt(document.getElementById('npyChannelSelect').value) || 0
+    : parseInt(document.getElementById('npyFrameSlider').value) || 0;
+  const r = await api('cam_npy_histogram', _npyCurrentFile, frameIdx, 256, _npySubdir);
+  if (r.error) return;
+  const canvas = document.getElementById('npyHistCanvas');
+  _histDraw(canvas, r, null, null);
+  document.getElementById('npyHistInfo').textContent =
+    r.min + ' – ' + r.max + '  (' + (r.max - r.min) + ')';
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1723,7 +1951,7 @@ function dispStopPolling() {
    ═══════════════════════════════════════════════════════════════════════════ */
 async function scopeCamConnect() {
   const r = await api('cam_connect');
-  if(r.error){ toast("Camera: "+r.error,"error"); return; }
+  if(r.error){ toast("Camera: "+r.error,"error"); logMsg("Camera connect: "+r.error,"error"); return; }
   scopeCamConnected = true;
   document.getElementById("scopeCamBadge").className="badge on";
   document.getElementById("scopeCamBadge").textContent="Online";
@@ -1747,25 +1975,26 @@ async function scopeCamDisconnect() {
   document.getElementById("scopeCamDisc").disabled=true;
   document.getElementById("scopeCamInfo").textContent="";
   updateIndicators();
+  logMsg("CoolSNAP EZ disconnected","camera");
 }
 async function scopeSetExposure() {
   const v = parseInt(document.getElementById("scopeExposure").value)||20;
   const r = await api('cam_set_exposure', v);
-  if(r.error) toast(r.error,"error");
-  else toast("Exposure: "+v+"ms","success");
+  if(r.error) { toast(r.error,"error"); logMsg("Exposure: "+r.error,"error"); }
+  else { toast("Exposure: "+v+"ms","success"); logMsg("Exposure set to "+v+" ms","camera"); }
 }
 async function scopeSetBinning() {
   const v = parseInt(document.getElementById("scopeBinning").value);
   const r = await api('cam_set_binning', v);
-  if(r.error) toast(r.error,"error");
-  else toast("Binning: "+v+"x"+v,"success");
+  if(r.error) { toast(r.error,"error"); logMsg("Binning: "+r.error,"error"); }
+  else { toast("Binning: "+v+"x"+v,"success"); logMsg("Binning set to "+v+"x"+v,"camera"); }
 }
 async function camSetSaveDir() {
   const p = document.getElementById("camSaveDirInput").value.trim();
   if(!p){ toast("Enter a path","error"); return; }
   const r = await api('cam_set_save_dir', p);
-  if(r.error) toast(r.error,"error");
-  else { document.getElementById("camSaveDir").textContent = r.path; toast("Save dir updated","success"); }
+  if(r.error) { toast(r.error,"error"); logMsg("Save dir: "+r.error,"error"); }
+  else { document.getElementById("camSaveDir").textContent = r.path; toast("Save dir updated","success"); logMsg("Save dir set to "+r.path,"camera"); }
 }
 
 function scopeShowPreview(b64) {
@@ -1777,38 +2006,42 @@ function scopeShowPreview(b64) {
 async function scopeSnap() {
   if(!scopeCamConnected){ toast("Connect camera first","error"); return; }
   const r = await api('cam_snap');
-  if(r.error){ toast("Snap: "+r.error,"error"); return; }
+  if(r.error){ toast("Snap: "+r.error,"error"); logMsg("Snap: "+r.error,"error"); return; }
   scopeShowPreview(r.image);
+  logMsg("Snap captured","camera");
 }
 async function scopeSnapSave() {
   if(!scopeCamConnected){ toast("Connect camera first","error"); return; }
   const r = await api('cam_snap_save');
-  if(r.error){ toast("Snap: "+r.error,"error"); return; }
+  if(r.error){ toast("Snap: "+r.error,"error"); logMsg("Snap save: "+r.error,"error"); return; }
   scopeShowPreview(r.image);
   addToFilmstrip(r.file);
   toast("Saved: "+r.file,"success");
+  logMsg("Snap saved: "+r.file,"camera");
 }
 
 async function scopeToggleLive() {
   if(scopeLiveActive) {
     scopeLiveActive = false;
-    dispStopPolling();
     if(_liveWs){ _liveWs.close(); _liveWs=null; }
     await api('cam_live_stop');
     document.getElementById("scopeLiveBtn").classList.remove("green");
     document.getElementById("scopeLiveBtn").textContent = "Live";
     document.getElementById("scopeFps").style.display = "none";
     if(_fpsPoller){ clearInterval(_fpsPoller); _fpsPoller=null; }
+    _liveHistStop();
+    logMsg("Live view stopped","camera");
     return;
   }
   if(!scopeCamConnected){ toast("Connect camera first","error"); return; }
   const r = await api('cam_live_start');
-  if(r.error){ toast(r.error,"error"); return; }
+  if(r.error){ toast(r.error,"error"); logMsg("Live start: "+r.error,"error"); return; }
 
   scopeLiveActive = true;
   document.getElementById("scopeLiveBtn").classList.add("green");
   document.getElementById("scopeLiveBtn").textContent = "Stop Live";
-  dispStartPolling();
+  if (_liveHistVisible) _liveHistStart();
+  logMsg("Live view started","camera");
 
   const proto = location.protocol==="https:"?"wss:":"ws:";
   _liveWs = new WebSocket(proto+"//"+location.host+"/cam/live");
@@ -1827,11 +2060,11 @@ async function scopeToggleLive() {
   _liveWs.onclose = function() {
     if(scopeLiveActive){
       scopeLiveActive=false;
-      dispStopPolling();
       document.getElementById("scopeLiveBtn").classList.remove("green");
       document.getElementById("scopeLiveBtn").textContent="Live";
       document.getElementById("scopeFps").style.display="none";
       if(_fpsPoller){ clearInterval(_fpsPoller); _fpsPoller=null; }
+      _liveHistStop();
     }
   };
   const fpsEl = document.getElementById("scopeFps");
@@ -1849,16 +2082,25 @@ function addToFilmstrip(name) {
   fs.innerHTML = scopeCaptures.map(n=>`<div class="filmstrip-item">${n}</div>`).join("");
 }
 
-onEvent("onCamCaptureComplete", function(filename) { addToFilmstrip(filename); });
+onEvent("onCamCaptureComplete", function(filename) {
+  addToFilmstrip(filename);
+  logMsg("Capture complete: "+filename,"camera");
+});
 onEvent("onCamStatus", function(status, msg) {
   document.getElementById("scopeCamStatus").textContent = msg;
+  if(status === "error") logMsg("Camera: "+msg,"error");
+  else if(status !== "idle") logMsg("Camera: "+msg,"camera");
+});
+onEvent("onTimelapseProgress", function(frame, total) {
+  logMsg(`Timelapse: frame ${frame}/${total}`,"camera");
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   PRESETS (localStorage)
+   PRESETS (in-memory, persisted via Save Config)
    ═══════════════════════════════════════════════════════════════════════════ */
-function _loadStore(key) { try{ return JSON.parse(localStorage.getItem(key))||{}; }catch(e){ return {}; } }
-function _saveStore(key, obj) { localStorage.setItem(key, JSON.stringify(obj)); }
+const _memStore = {};
+function _loadStore(key) { return _memStore[key] || {}; }
+function _saveStore(key, obj) { _memStore[key] = obj; }
 
 /* Microscope presets */
 function msSavePreset() {
@@ -1879,6 +2121,7 @@ function msSavePreset() {
   renderMsPresets();
   refreshAcqDropdowns();
   toast("Microscope preset saved","success");
+  logMsg("Microscope preset saved: "+name,"sys");
 }
 async function msLoadPreset(name) {
   const obj = _loadStore("mosaic_ms_presets");
@@ -1897,6 +2140,7 @@ async function msLoadPreset(name) {
   if(p.ilShutterOpen != null) { _intensiOn = !!p.ilShutterOpen; updateIntensiBadge(); document.getElementById("ilShutterState").textContent = _intensiOn ? "Open" : "Closed"; }
   scopeRefreshTi();
   toast("Loaded: "+name,"success");
+  logMsg("Microscope preset loaded: "+name,"sys");
 }
 function msEditPreset(name) {
   const obj = _loadStore("mosaic_ms_presets");
@@ -1943,14 +2187,16 @@ function acqSavePreset() {
   const ms = document.getElementById("acqMsPreset").value;
   const exposure = parseInt(document.getElementById("acqExposure").value) || 50;
   const binning = parseInt(document.getElementById("acqBinning").value) || 1;
+  const color = document.getElementById("acqColor").value || 'auto';
   if(!name){ toast("Enter a name","error"); return; }
   if(!ms){ toast("Select a scope preset","error"); return; }
   const obj = _loadStore("mosaic_acq_presets");
-  obj[name] = { microscopePreset: ms, exposure_ms: exposure, binning: binning };
+  obj[name] = { microscopePreset: ms, exposure_ms: exposure, binning: binning, color: color };
   _saveStore("mosaic_acq_presets", obj);
   document.getElementById("acqPresetName").value = "";
   renderAcqPresets();
   toast("Acquisition preset saved","success");
+  logMsg("Acquisition preset saved: "+name,"sys");
 }
 function acqDeletePreset(name) {
   const obj = _loadStore("mosaic_acq_presets");
@@ -1965,6 +2211,7 @@ function acqEditPreset(name) {
   document.getElementById("acqMsPreset").value = p.microscopePreset || '';
   document.getElementById("acqExposure").value = p.exposure_ms || 50;
   document.getElementById("acqBinning").value = p.binning || 1;
+  document.getElementById("acqColor").value = p.color || 'auto';
   acqUpdateSwatch();
 }
 const _ACQ_COLOR_HEX = {
@@ -1973,20 +2220,22 @@ const _ACQ_COLOR_HEX = {
 };
 const _FILTER_CUBE_COLOR = {1:'none', 2:'blue', 3:'green', 4:'red'};
 const _FILTER_CUBE_NAME  = {1:'DIA', 2:'DAPI', 3:'GFP', 4:'TxRed'};
-function acqResolveColor(msPresetName) {
+function acqAutoColor(msPresetName) {
   const msObj = _loadStore("mosaic_ms_presets");
   const m = msObj[msPresetName];
   return m ? (_FILTER_CUBE_COLOR[m.filter] || 'none') : 'none';
 }
+function acqResolveColor(msPresetName, explicitColor) {
+  if(explicitColor && explicitColor !== 'auto') return explicitColor;
+  return acqAutoColor(msPresetName);
+}
 function acqUpdateSwatch() {
   const swatch = document.getElementById("acqColorSwatch");
   const msName = document.getElementById("acqMsPreset").value;
-  const color = acqResolveColor(msName);
+  const explicit = document.getElementById("acqColor").value;
+  const color = acqResolveColor(msName, explicit);
   if(swatch) {
     swatch.style.background = _ACQ_COLOR_HEX[color] || '#888';
-    const msObj = _loadStore("mosaic_ms_presets");
-    const m = msObj[msName];
-    swatch.title = m ? (_FILTER_CUBE_NAME[m.filter] || 'DIA') : '';
   }
 }
 async function acqLoadPreset(name) {
@@ -1996,6 +2245,7 @@ async function acqLoadPreset(name) {
   document.getElementById("acqExposure").value = p.exposure_ms || 50;
   document.getElementById("acqBinning").value = p.binning || 1;
   document.getElementById("acqMsPreset").value = p.microscopePreset || '';
+  document.getElementById("acqColor").value = p.color || 'auto';
   acqUpdateSwatch();
   const tasks = [];
   if(p.microscopePreset) tasks.push(msLoadPreset(p.microscopePreset));
@@ -2013,9 +2263,9 @@ function renderAcqPresets() {
   el.innerHTML = Object.keys(obj).map(n => {
     const p = obj[n];
     const m = msObj[p.microscopePreset];
-    const filterColor = m ? (_FILTER_CUBE_COLOR[m.filter] || 'none') : 'none';
+    const resolvedColor = acqResolveColor(p.microscopePreset, p.color);
     const cubeName = m ? (_FILTER_CUBE_NAME[m.filter] || 'DIA') : '?';
-    const swatchHex = _ACQ_COLOR_HEX[filterColor] || '#888';
+    const swatchHex = _ACQ_COLOR_HEX[resolvedColor] || '#888';
     return `<div class="preset-chip" onclick="acqLoadPreset('${n}')">
       <span>${n}</span>
       <span style="display:inline-block;width:10px;height:10px;background:${swatchHex};border-radius:2px;vertical-align:middle;margin:0 2px" title="${cubeName}"></span>
@@ -2033,7 +2283,7 @@ function refreshAcqDropdowns() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   EXPERIMENT SAVE / LOAD  (single JSON: presets + timeline + pumps)
+   CONFIGURATION SAVE / LOAD  (single JSON file: all presets + timeline + cavro)
    ═══════════════════════════════════════════════════════════════════════════ */
 function expGatherState() {
   const durEl = document.getElementById("tlDuration");
@@ -2050,6 +2300,11 @@ function expGatherState() {
       cycleDurationUnit: unitEl ? unitEl.value : 'm',
       repeatCount: parseInt(repEl ? repEl.value : 1),
       forever: forEl ? forEl.checked : false
+    },
+    cavro: {
+      syringe_ml: parseFloat(document.getElementById("cavroSyringe")?.value) || 0.5,
+      valve_positions: parseInt(document.getElementById("cavroValves")?.value) || 6,
+      addresses: document.getElementById("cavroAddresses")?.value || "0,1,2,3",
     }
   };
 }
@@ -2079,56 +2334,94 @@ function expRestoreState(data) {
     tlUpdateTotalTime();
     tlRender();
   }
+  if(data.cavro) {
+    const c = data.cavro;
+    if(c.syringe_ml != null)     document.getElementById("cavroSyringe").value   = c.syringe_ml;
+    if(c.valve_positions != null) document.getElementById("cavroValves").value    = c.valve_positions;
+    if(c.addresses)              document.getElementById("cavroAddresses").value = c.addresses;
+  }
 }
 
-async function expSave() {
+async function cfgSave() {
   const name = document.getElementById("tlExpName").value.trim();
-  if(!name){ toast("Enter an experiment name first","error"); return; }
+  if(!name){ toast("Enter a configuration name first","error"); return; }
   const payload = expGatherState();
-  const res = await api('experiment_save', name, payload);
-  if(res.error){ toast(res.error,"error"); return; }
-  toast("Experiment saved: " + name, "success");
-  expRefreshList();
+  const res = await api('config_save_named', name, payload);
+  if(res.error){ toast(res.error,"error"); logMsg("Config save: "+res.error,"error"); return; }
+  toast("Configuration saved: " + name, "success");
+  logMsg("Configuration saved: "+name,"sys");
 }
 
-async function expLoadSelected() {
-  const sel = document.getElementById("expSavedList");
-  const name = sel.value;
-  if(!name) return;
-  const res = await api('experiment_load', name);
-  if(res.error){ toast(res.error,"error"); sel.value = ''; return; }
+async function cfgShowLoad() {
+  const res = await api('config_list_named');
+  const configs = (res && res.configs) || [];
+  if(!configs.length){ toast("No saved configurations","info"); return; }
+  _cfgShowModal(configs, false);
+}
+
+function _cfgShowModal(configs, isStartup) {
+  let sel = null;
+  const overlay = document.createElement("div");
+  overlay.className = "cfg-overlay";
+
+  const fmtDate = (iso) => {
+    if(!iso) return "";
+    try { const d = new Date(iso); return d.toLocaleDateString() + " " + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+    catch(e){ return iso; }
+  };
+
+  const items = configs.map((c,i) =>
+    `<div class="cfg-item" data-idx="${i}" onclick="this.parentElement.querySelectorAll('.cfg-item').forEach(e=>e.classList.remove('selected'));this.classList.add('selected')">
+      <span class="cfg-name">${c.name}</span>
+      <span class="cfg-date">${fmtDate(c.saved)}</span>
+      <span class="cfg-del" onclick="event.stopPropagation();cfgDeleteFromModal('${c.name.replace(/'/g,"\\'")}',this)" title="Delete">&times;</span>
+    </div>`
+  ).join("");
+
+  overlay.innerHTML = `<div class="cfg-modal">
+    <h3>${isStartup ? 'Load Configuration' : 'Load Configuration'}</h3>
+    <div class="cfg-list">${items}</div>
+    <div class="cfg-btns">
+      ${isStartup ? '<button class="btn btn-sm" onclick="cfgCloseModal()">Skip</button>' : '<button class="btn btn-sm" onclick="cfgCloseModal()">Cancel</button>'}
+      <button class="btn btn-sm blue" onclick="cfgLoadSelected()">Load</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e) => { if(e.target === overlay) cfgCloseModal(); });
+  overlay.querySelectorAll('.cfg-item')[0]?.classList.add('selected');
+}
+
+function cfgCloseModal() {
+  document.querySelector(".cfg-overlay")?.remove();
+}
+
+async function cfgLoadSelected() {
+  const selected = document.querySelector(".cfg-item.selected");
+  if(!selected){ toast("Select a configuration","error"); return; }
+  const name = selected.querySelector(".cfg-name").textContent;
+  const res = await api('config_load_named', name);
+  if(res.error){ toast(res.error,"error"); logMsg("Config load: "+res.error,"error"); return; }
   document.getElementById("tlExpName").value = res.data.name || name;
   expRestoreState(res.data.payload);
   toast("Loaded: " + name, "success");
-  sel.value = '';
+  logMsg("Configuration loaded: "+name,"sys");
+  cfgCloseModal();
 }
 
-async function expDeleteSelected() {
-  const sel = document.getElementById("expSavedList");
-  const name = sel.value;
-  if(!name){ toast("Select an experiment to delete","error"); return; }
-  if(!confirm("Delete experiment '" + name + "'?")) return;
-  await api('experiment_delete_saved', name);
-  toast("Deleted: " + name, "info");
-  sel.value = '';
-  expRefreshList();
-}
-
-async function expRefreshList() {
-  const names = await api('experiment_list_saved');
-  const sel = document.getElementById("expSavedList");
-  const opts = '<option value="">Load saved...</option>' +
-    (Array.isArray(names) ? names : []).map(n => `<option value="${n}">${n}</option>`).join("");
-  sel.innerHTML = opts;
+async function cfgDeleteFromModal(name, el) {
+  if(!confirm("Delete configuration '" + name + "'?")) return;
+  await api('config_delete_named', name);
+  const item = el.closest(".cfg-item");
+  item.remove();
+  const remaining = document.querySelectorAll(".cfg-item");
+  if(!remaining.length) cfgCloseModal();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TIMELINE  –  Number-line with lanes
    ═══════════════════════════════════════════════════════════════════════════ */
-let tlEvents = JSON.parse(localStorage.getItem("mosaic_tl_events")||"[]").filter(e => e.type !== 'pump');
-let tlLanes  = (JSON.parse(localStorage.getItem("mosaic_tl_lanes")||'null')
-               || [{id:"imaging", label:"Imaging", type:"imaging"}])
-               .filter(l => l.type !== 'pump');
+let tlEvents = [];
+let tlLanes  = [{id:"imaging", label:"Imaging", type:"imaging"}];
 let tlSelectedId = null;
 let tlRunning = false;
 let tlAbort = false;
@@ -2143,16 +2436,24 @@ const TL_LABELS = {
   video:'Video', stack:'Preset Stack', timelapse:'Timelapse', pump:'Pump', cavro:'Cavro'
 };
 
-function tlSaveEvents() {
-  localStorage.setItem("mosaic_tl_events", JSON.stringify(tlEvents));
-  api('config_save', 'timeline_events', tlEvents).catch(()=>{});
-}
-function tlSaveLanes() {
-  localStorage.setItem("mosaic_tl_lanes", JSON.stringify(tlLanes));
-  api('config_save', 'timeline_lanes', tlLanes).catch(()=>{});
+function tlSaveEvents() { /* in-memory only — persisted via Save Config */ }
+function tlSaveLanes() { /* in-memory only — persisted via Save Config */ }
+function tlZoomChanged() {
+  const scrollEl = document.getElementById("tlScroll");
+  const oldPps = tlPxPerSec();
+  const viewCenter = scrollEl.scrollLeft + scrollEl.clientWidth / 2;
+  const centerSec = (viewCenter - 56) / oldPps;
+
+  // Force pps recalc by reading the new slider value inside tlRender
+  tlRender();
+
+  const newPps = tlPxPerSec();
+  const newCenter = centerSec * newPps + 56;
+  scrollEl.scrollLeft = Math.max(0, newCenter - scrollEl.clientWidth / 2);
 }
 function tlPxPerSec() {
-  const slider = parseFloat(document.getElementById("tlZoom").value) || 30;
+  const raw = parseFloat(document.getElementById("tlZoom").value);
+  const slider = isNaN(raw) ? 30 : raw;
   const t = slider / 100;
   const scrollEl = document.getElementById("tlScroll");
   const viewW = scrollEl ? scrollEl.clientWidth - 56 : 800;
@@ -2198,12 +2499,6 @@ function tlUpdateTotalTime() {
   } else {
     el.textContent = `${tlFormatDuration(cycle)} \u00d7 ${reps} = ${tlFormatDuration(total)}`;
   }
-  api('config_save', 'timeline_settings', {
-    cycleDuration: parseFloat(document.getElementById("tlDuration").value) || 60,
-    cycleDurationUnit: document.getElementById("tlDurUnit").value,
-    repeatCount: parseInt(document.getElementById("tlRepeat").value) || 1,
-    forever: document.getElementById("tlForever").checked,
-  }).catch(()=>{});
 }
 
 function _tlCavroConflict(lane, e) {
@@ -2212,6 +2507,8 @@ function _tlCavroConflict(lane, e) {
   const eLane = tlLanes.find(l => l.id === e.laneId);
   if(!eLane || eLane.type !== 'cavro') return false;
   if(e.cavroAction === 'coordinated' && e.partnerIdx === lane.cavroIdx) return true;
+  if(e.cavroAction === 'dualpush' &&
+     (e.partnerIdx === lane.cavroIdx || e.outletIdx === lane.cavroIdx)) return true;
   if(e.cavroAction === 'continuous' && eLane.cavroIdx === lane.cavroIdx) return true;
   return false;
 }
@@ -2413,6 +2710,13 @@ function tlRender() {
     row.className = 'tl-lane-row';
     row.style.position = 'relative';
 
+    if(lane.type === 'cavro') {
+      const actions = document.createElement("div");
+      actions.className = 'tl-lane-actions';
+      actions.innerHTML = `<button title="Remove lane" onclick="tlRemoveLane('${lane.id}')">&times;</button>`;
+      row.appendChild(actions);
+    }
+
     const label = document.createElement("div");
     label.className = 'tl-lane-label';
     label.style.top = '10px';
@@ -2426,23 +2730,27 @@ function tlRender() {
     laneDiv.style.width = (rulerW - 56) + 'px';
     row.appendChild(laneDiv);
 
-    if(lane.type === 'cavro') {
-      const actions = document.createElement("div");
-      actions.className = 'tl-lane-actions';
-      actions.innerHTML = `<button title="Remove lane" onclick="tlRemoveLane('${lane.id}')">&times;</button>`;
-      row.appendChild(actions);
-    }
-
     lanesEl.appendChild(row);
 
     const laneEvs = tlEvents.filter(e => e.laneId === lane.id);
-    const coordMirrors = tlEvents.filter(e =>
-      e.type === 'cavro' && e.cavroAction === 'coordinated' &&
-      e.laneId !== lane.id &&
-      tlLanes.some(l => l.id === lane.id && l.type === 'cavro' && l.cavroIdx === e.partnerIdx)
-    );
+    const coordMirrors = tlEvents.filter(e => {
+      if(e.type !== 'cavro' || e.laneId === lane.id) return false;
+      const thisLane = tlLanes.find(l => l.id === lane.id);
+      if(!thisLane || thisLane.type !== 'cavro') return false;
+      if(e.cavroAction === 'coordinated' && e.partnerIdx === thisLane.cavroIdx) return true;
+      if(e.cavroAction === 'dualpush' &&
+         (e.partnerIdx === thisLane.cavroIdx || e.outletIdx === thisLane.cavroIdx)) return true;
+      return false;
+    });
 
-    [...laneEvs, ...coordMirrors.map(e => ({...e, _mirror: true}))].forEach(ev => {
+    [...laneEvs, ...coordMirrors.map(e => {
+      const thisLane = tlLanes.find(l => l.id === lane.id);
+      let role = 'partner';
+      if(e.cavroAction === 'dualpush' && thisLane) {
+        role = e.outletIdx === thisLane.cavroIdx ? 'outlet' : 'inlet2';
+      }
+      return {...e, _mirror: true, _mirrorRole: role};
+    })].forEach(ev => {
       const isMirror = !!ev._mirror;
       const left = ev.start * pps;
       const width = Math.max(ev.duration * pps, 14);
@@ -2457,12 +2765,14 @@ function tlRender() {
       if(ev.type === 'cavro') {
         if(ev.cavroAction === 'coordinated') {
           blockLabel = isMirror ? `${ev.name} (outlet)` : `${ev.name} (inlet)`;
+        } else if(ev.cavroAction === 'dualpush') {
+          if(!isMirror) blockLabel = `${ev.name} (in1)`;
+          else if(ev._mirrorRole === 'inlet2') blockLabel = `${ev.name} (in2)`;
+          else blockLabel = `${ev.name} (out)`;
         } else if(ev.cavroAction === 'continuous') {
           blockLabel = `${ev.name} — Cont`;
         } else if(ev.cavroAction === 'dispense') {
           blockLabel = `${ev.name} — Disp`;
-        } else if(ev.cavroAction === 'valve') {
-          blockLabel = `${ev.name} — Valve`;
         }
       }
       div.innerHTML = `<span class="ev-label">${blockLabel}</span>` +
@@ -2657,6 +2967,8 @@ function tlOpenEditor(ev) {
   } else if(ev.type === 'timelapse') {
     ev.duration = tlTimelapseCalcDuration(ev);
     durField.style.display = 'none';
+  } else if(ev.type === 'cavro' && ev.cavroAction === 'dispense') {
+    durField.style.display = 'none';
   } else if(ev.type === 'video') {
     durField.style.display = '';
     if(!ev._recordDur) ev._recordDur = ev.duration - tlEventOverhead(ev);
@@ -2719,8 +3031,8 @@ function tlOpenEditor(ev) {
   if(ev.type === 'cavro') {
     presetCol.style.display = 'none';
     const cavroLanes = tlLanes.filter(l => l.type === 'cavro');
-    const act = ev.cavroAction || 'valve';
-    const pumpLabel = act === 'coordinated' ? 'Input Pump' : 'Pump';
+    const act = ev.cavroAction || 'dispense';
+    const pumpLabel = act === 'coordinated' ? 'Input Pump' : act === 'dualpush' ? 'Inlet 1' : 'Pump';
     ts.innerHTML = `<div class="field" style="margin:0">
       <label>${pumpLabel}</label>
       <select id="tlEdCavroLane" onchange="tlEditorChanged()" style="min-width:80px">
@@ -2733,7 +3045,7 @@ function tlOpenEditor(ev) {
         <option value="dispense" ${act==='dispense'?'selected':''}>Dispense</option>
         <option value="continuous" ${act==='continuous'?'selected':''}>Continuous</option>
         <option value="coordinated" ${act==='coordinated'?'selected':''}>Coordinated</option>
-        <option value="valve" ${act==='valve'?'selected':''}>Switch Valve</option>
+        <option value="dualpush" ${act==='dualpush'?'selected':''}>Dual Push</option>
       </select>
     </div>
     <div id="tlEdCavroFields">
@@ -2815,15 +3127,56 @@ function tlOpenEditor(ev) {
         </select>
       </div>
       <div style="font-size:10px;color:var(--text3);margin-top:2px" id="tlEdCavroEst"></div>` : ''}
-    ${act==='valve' ? `
+    ${act==='dualpush' ? `
       <div class="field" style="margin:0">
-        <label>Inlet</label>
+        <label>Inlet 2</label>
+        <select id="tlEdCavroPartner" onchange="tlEditorChanged()" style="min-width:80px">
+          ${cavroLanes.filter(l=>l.id!==ev.laneId).map(l => `<option value="${l.cavroIdx}" ${ev.partnerIdx===l.cavroIdx?'selected':''}>${l.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label>Outlet</label>
+        <select id="tlEdCavroOutlet" onchange="tlEditorChanged()" style="min-width:80px">
+          ${cavroLanes.filter(l=>l.id!==ev.laneId && l.cavroIdx!==(ev.partnerIdx??-1)).map(l => `<option value="${l.cavroIdx}" ${ev.outletIdx===l.cavroIdx?'selected':''}>${l.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label>Inlet 1</label>
+        <span style="font-size:10px;color:var(--text3)">from</span>
         <input type="number" id="tlEdCavroFrom" value="${ev.fromPort||1}" min="1" max="6"
                style="width:54px" oninput="tlEditorChanged()">
-        <label style="min-width:auto">Outlet</label>
+        <span style="font-size:10px;color:var(--text3)">to</span>
         <input type="number" id="tlEdCavroTo" value="${ev.toPort||2}" min="1" max="6"
                style="width:54px" oninput="tlEditorChanged()">
-      </div>` : ''}
+      </div>
+      <div class="field" style="margin:0">
+        <label>Inlet 2</label>
+        <span style="font-size:10px;color:var(--text3)">from</span>
+        <input type="number" id="tlEdCavroIn2From" value="${ev.in2FromPort||1}" min="1" max="6"
+               style="width:54px" oninput="tlEditorChanged()">
+        <span style="font-size:10px;color:var(--text3)">to</span>
+        <input type="number" id="tlEdCavroIn2To" value="${ev.in2ToPort||2}" min="1" max="6"
+               style="width:54px" oninput="tlEditorChanged()">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Outlet</label>
+        <span style="font-size:10px;color:var(--text3)">from</span>
+        <input type="number" id="tlEdCavroOutFrom" value="${ev.outFromPort||1}" min="1" max="6"
+               style="width:54px" oninput="tlEditorChanged()">
+        <span style="font-size:10px;color:var(--text3)">to</span>
+        <input type="number" id="tlEdCavroOutTo" value="${ev.outToPort||3}" min="1" max="6"
+               style="width:54px" oninput="tlEditorChanged()">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Vel</label>
+        <input type="number" id="tlEdCavroVel" value="${ev.velocity||''}" step="0.01"
+               placeholder="auto" style="width:60px" oninput="tlEditorChanged()">
+        <select id="tlEdCavroVelUnit" onchange="tlEditorChanged()" style="min-width:60px;font-size:10px">
+          <option value="ulmin" ${(ev.velUnit||'ulmin')==='ulmin'?'selected':''}>µL/min</option>
+          <option value="mls" ${ev.velUnit==='mls'?'selected':''}>mL/s</option>
+        </select>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:2px" id="tlEdCavroEst"></div>` : ''}
     </div>`;
   } else {
     if(ev.type === 'stack') {
@@ -2857,8 +3210,8 @@ function tlOpenEditor(ev) {
         const a = acqObj[p] || {};
         const m = msObj[a.microscopePreset] || {};
         const cube = _FILTER_CUBE_NAME[m.filter] || '?';
-        const cubeColor = _FILTER_CUBE_COLOR[m.filter] || 'none';
-        const swHex = _ACQ_COLOR_HEX[cubeColor] || '#888';
+        const resolvedC = acqResolveColor(a.microscopePreset, a.color);
+        const swHex = _ACQ_COLOR_HEX[resolvedC] || '#888';
         return `<tr>
           <td style="padding:2px 4px"><span style="display:inline-block;width:8px;height:8px;background:${swHex};border-radius:2px;vertical-align:middle;margin-right:4px"></span>${p}</td>
           <td style="padding:2px 4px;font-size:10px;color:var(--text3)">${cube} — ${a.exposure_ms||'?'}ms ${a.binning||'?'}x</td>
@@ -2878,9 +3231,6 @@ function tlOpenEditor(ev) {
             ${acqNames.map(n => `<option value="${n}">${n}</option>`).join('')}
           </select>
           <button class="btn btn-sm accent" onclick="tlStackChAdd()">Add</button>
-        </div>
-        <div class="field" style="margin:4px 0 0 0">
-          <label style="font-size:10px"><input type="checkbox" id="tlEdKeepShutter" ${ev.keepShutterOpen?'checked':''} onchange="tlEditorChanged()"> Keep shutter open</label>
         </div>
       </div>`;
     } else if(ev.type === 'timelapse') {
@@ -2966,6 +3316,8 @@ function tlEditorChanged() {
     wantDur = tlStackCalcDuration(ev);
   } else if(ev.type === 'timelapse') {
     wantDur = tlTimelapseCalcDuration(ev);
+  } else if(ev.type === 'cavro' && ev.cavroAction === 'dispense') {
+    wantDur = ev.duration;
   } else if(ev.type === 'video') {
     ev._recordDur = edDur;
     wantDur = edDur + tlEventOverhead(ev);
@@ -3020,12 +3372,20 @@ function tlEditorChanged() {
     }
     const partnerEl = document.getElementById("tlEdCavroPartner");
     if(partnerEl) ev.partnerIdx = parseInt(partnerEl.value) || 0;
+    const outletEl = document.getElementById("tlEdCavroOutlet");
+    if(outletEl) ev.outletIdx = parseInt(outletEl.value) || 0;
+    const in2FromEl = document.getElementById("tlEdCavroIn2From");
+    if(in2FromEl) ev.in2FromPort = parseInt(in2FromEl.value) || 1;
+    const in2ToEl = document.getElementById("tlEdCavroIn2To");
+    if(in2ToEl) ev.in2ToPort = parseInt(in2ToEl.value) || 2;
     const outFromEl = document.getElementById("tlEdCavroOutFrom");
     if(outFromEl) ev.outFromPort = parseInt(outFromEl.value) || 1;
     const outToEl = document.getElementById("tlEdCavroOutTo");
     if(outToEl) ev.outToPort = parseInt(outToEl.value) || 3;
     const laneChanged = prevLaneId !== newLaneId;
-    if(ev.cavroAction !== prevAction || (laneChanged && ev.cavroAction === 'coordinated')) {
+    const needsRerender = ev.cavroAction !== prevAction ||
+      (laneChanged && (ev.cavroAction === 'coordinated' || ev.cavroAction === 'dualpush'));
+    if(needsRerender) {
       if(laneChanged) {
         const newLane = tlLanes.find(l => l.id === newLaneId);
         if(newLane) ev.cavroIdx = newLane.cavroIdx;
@@ -3059,28 +3419,26 @@ function tlEditorChanged() {
         estEl.style.color = '';
       }
     }
-    if(ev.cavroAction === 'valve') {
-      ev.duration = 1;
-      ev._durUnit = 'sec';
-      document.getElementById("tlEdDurUnit").value = 'sec';
-      document.getElementById("tlEdDur").value = 1;
-    }
     if(ev.cavroAction === 'dispense') {
       const defVelMlS = 1400 / countsPerMl;
       const vel = velMlS || defVelMlS;
       const vol = ev.volume || 0;
-      const strokes = Math.ceil(vol / syr);
-      const pullTime = strokes * 1;
+      const maxPullMlS = 5800 / countsPerMl;
+      const fullStrokes = Math.floor(vol / syr);
+      const remaining = vol % syr;
+      const totalStrokes = fullStrokes + (remaining > 0.0001 ? 1 : 0);
+      const pullTime = fullStrokes * (syr / maxPullMlS)
+                      + (remaining > 0.0001 ? remaining / maxPullMlS : 0);
       const pushTime = vol / vel;
-      const valveTime = strokes * 0.5;
+      const valveTime = totalStrokes * 2 * 0.25;
       const estSec = Math.ceil(pullTime + pushTime + valveTime);
       ev.duration = Math.max(estSec, 1);
       ev._durUnit = 'sec';
       document.getElementById("tlEdDurUnit").value = 'sec';
       document.getElementById("tlEdDur").value = ev.duration;
       if(estEl && !(velMlS && (velMlS < minMlS || velMlS > maxMlS))) {
-        const pushOnly = Math.ceil(pushTime);
-        estEl.textContent = `~${estSec}s total (pull ~${Math.ceil(pullTime)}s + push ~${pushOnly}s, ${strokes} stroke${strokes>1?'s':''})`;
+        estEl.textContent = `~${estSec}s (${totalStrokes} stroke${totalStrokes>1?'s':''}: refill ~${Math.ceil(pullTime)}s + dispense ~${Math.ceil(pushTime)}s)`;
+        estEl.style.color = '';
       }
     }
   } else {
@@ -3163,7 +3521,7 @@ async function tlApplyAcqPreset(presetName) {
     if(a.exposure_ms != null) tasks.push(api('cam_set_exposure', a.exposure_ms));
     if(a.binning != null) tasks.push(api('cam_set_binning', a.binning));
   }
-  const color = acqResolveColor(a.microscopePreset);
+  const color = acqResolveColor(a.microscopePreset, a.color);
   tasks.push(api('cam_set_pseudo_color', color));
   await Promise.all(tasks);
 }
@@ -3224,18 +3582,17 @@ async function tlRunCycle(sorted, progress) {
   function launchEvent(ev, maxMs, progress) {
     const run = async () => {
       try {
+        logMsg(`Event "${ev.name}" (${ev.type}) executing`, "exp");
         if(ev.type === 'cavro') {
           const ci = parseInt(ev.cavroIdx) || 0;
-          const act = ev.cavroAction || 'valve';
+          const act = ev.cavroAction || 'dispense';
           let vel = null;
           if(ev.velocity !== '' && ev.velocity != null) {
             vel = parseFloat(ev.velocity);
             if(ev.velUnit === 'ulmin') vel = vel / 60000;
           }
-          if(act === 'valve') {
-            await api('cavro_switch_valve', ci, ev.fromPort||1);
-            await api('cavro_switch_valve', ci, ev.toPort||2);
-          } else if(act === 'dispense') {
+          if(act === 'dispense') {
+            logMsg(`Cavro C${ci}: dispense ${ev.volume||0.5} mL ${ev.fromPort||1}→${ev.toPort||2}`, "exp");
             await api('cavro_dispense', ci, ev.volume||0.5, ev.fromPort||1, ev.toPort||2, vel);
           } else if(act === 'continuous') {
             await api('cavro_continuous_start', ci, ev.fromPort||1, ev.toPort||2, vel, 0);
@@ -3250,6 +3607,16 @@ async function tlRunCycle(sorted, progress) {
             const durMs = (ev.duration || 60) * 1000;
             await tlSleep(Math.min(durMs, maxMs));
             await api('cavro_coordinated_stop');
+          } else if(act === 'dualpush') {
+            const pi = parseInt(ev.partnerIdx) || 1;
+            const oi = parseInt(ev.outletIdx) || 2;
+            await api('cavro_dualpush_start', ci, pi, oi,
+              parseInt(ev.fromPort)||1, parseInt(ev.toPort)||2,
+              parseInt(ev.in2FromPort)||1, parseInt(ev.in2ToPort)||2,
+              parseInt(ev.outFromPort)||1, parseInt(ev.outToPort)||3, vel);
+            const durMs = (ev.duration || 60) * 1000;
+            await tlSleep(Math.min(durMs, maxMs));
+            await api('cavro_dualpush_stop');
           }
         } else {
           await tlApplyPresets(ev);
@@ -3279,7 +3646,7 @@ async function tlRunCycle(sorted, progress) {
                   il_shutter_open: m.ilShutterOpen != null ? !!m.ilShutterOpen : null,
                   il_nd: m.ilNd ?? null,
                   exposure_ms: a.exposure_ms ?? null, binning: a.binning ?? 1,
-                  color: _FILTER_CUBE_COLOR[m.filter] || 'none'
+                  color: acqResolveColor(a.microscopePreset, a.color)
                 };
               }).filter(Boolean);
               await api('cam_stack_capture', channels, !!ev.keepShutterOpen);
@@ -3320,26 +3687,32 @@ async function tlStopCaptures(sorted) {
 
 async function tlStopAllHardware(sorted) {
   const stops = [];
-  const seenCavro = new Set();
+  let hasCavro = false;
   for(const ev of sorted) {
     if(ev.type === 'cavro') {
+      hasCavro = true;
       const ci = parseInt(ev.cavroIdx) || 0;
-      if(ev.cavroAction === 'continuous' && !seenCavro.has('cont_'+ci)) {
-        seenCavro.add('cont_'+ci);
+      if(ev.cavroAction === 'continuous' && !stops._contSeen?.has(ci)) {
+        (stops._contSeen = stops._contSeen || new Set()).add(ci);
         stops.push(api('cavro_continuous_stop', ci).catch(()=>{}));
       }
-      if(ev.cavroAction === 'coordinated' && !seenCavro.has('coord')) {
-        seenCavro.add('coord');
+      if(ev.cavroAction === 'coordinated' && !stops._coordSeen) {
+        stops._coordSeen = true;
         stops.push(api('cavro_coordinated_stop').catch(()=>{}));
+      }
+      if(ev.cavroAction === 'dualpush' && !stops._dualSeen) {
+        stops._dualSeen = true;
+        stops.push(api('cavro_dualpush_stop').catch(()=>{}));
       }
     }
     if(ev.type === 'video' || ev.type === 'timelapse') {
-      if(!seenCavro.has('cam')) {
-        seenCavro.add('cam');
+      if(!stops._camSeen) {
+        stops._camSeen = true;
         stops.push(api('cam_capture_stop').catch(()=>{}));
       }
     }
   }
+  if(hasCavro) stops.push(api('cavro_stop_all').catch(()=>{}));
   const off = [];
   if(scopeTiConnected) { off.push(api('ti_shutter_close').catch(()=>{})); off.push(api('ti_dia_lamp_off').catch(()=>{})); }
   if(_ilConnected) off.push(api('il_shutter_close').catch(()=>{}));
@@ -3361,9 +3734,9 @@ async function tlPlay() {
   try {
     expRes = await api('cam_experiment_start', expName);
   } catch(e) {
-    toast("Server error: " + e.message, "error"); return;
+    toast("Server error: " + e.message, "error"); logMsg("Timeline start: "+e.message,"error"); return;
   }
-  if(expRes.error){ toast("Experiment folder: "+expRes.error,"error"); return; }
+  if(expRes.error){ toast("Experiment folder: "+expRes.error,"error"); logMsg("Experiment folder: "+expRes.error,"error"); return; }
   logMsg("Experiment folder: "+expRes.path, "exp");
   api('cam_experiment_set_payload', expGatherState()).catch(()=>{});
   tlRunning = true; tlAbort = false;
@@ -3433,6 +3806,7 @@ async function tlPlay() {
 
 function tlStop() {
   tlAbort = true;
+  api('cavro_stop_all').catch(()=>{});
 }
 
 function tlClearAll() {
@@ -3443,35 +3817,13 @@ function tlClearAll() {
   tlSaveEvents();
   tlRender();
   toast("Timeline cleared","info");
+  logMsg("Timeline cleared","sys");
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    INIT
    ═══════════════════════════════════════════════════════════════════════════ */
 (async function init() {
-  try {
-    const res = await api('config_load_all');
-    if(res && res.data) {
-      const d = res.data;
-      if(d.timeline_events) {
-        tlEvents = d.timeline_events.filter(e => e.type !== 'pump');
-        localStorage.setItem("mosaic_tl_events", JSON.stringify(tlEvents));
-      }
-      if(d.timeline_lanes) {
-        tlLanes = d.timeline_lanes.filter(l => l.type !== 'pump');
-        localStorage.setItem("mosaic_tl_lanes", JSON.stringify(tlLanes));
-      }
-      if(d.timeline_settings) {
-        const s = d.timeline_settings;
-        if(s.cycleDuration != null)     document.getElementById("tlDuration").value  = s.cycleDuration;
-        if(s.cycleDurationUnit)         document.getElementById("tlDurUnit").value   = s.cycleDurationUnit;
-        if(s.repeatCount != null)       document.getElementById("tlRepeat").value    = s.repeatCount;
-        if(s.forever != null)           document.getElementById("tlForever").checked = s.forever;
-      }
-    }
-  } catch(e) {
-    console.warn("Config load failed, using localStorage:", e);
-  }
   buildPumps();
   refreshPorts();
   renderMsPresets();
@@ -3479,8 +3831,15 @@ function tlClearAll() {
   refreshAcqDropdowns();
   tlRender();
   tlUpdateTotalTime();
-  expRefreshList();
   logMsg("Mosaic Control Center ready","sys");
+
+  // Show load-config dialog on startup if saved configs exist
+  try {
+    const cfgRes = await api('config_list_named');
+    if(cfgRes && cfgRes.configs && cfgRes.configs.length) {
+      _cfgShowModal(cfgRes.configs, true);
+    }
+  } catch(e) {}
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3738,6 +4097,7 @@ async function npyLoadFrame(filename, frameIdx, dispMin, dispMax) {
       document.getElementById("npyFrameLabel").textContent = `${r.frame_idx + 1} / ${r.n_frames}`;
     }
   }
+  npyHistUpdate();
   return r;
 }
 
@@ -3820,7 +4180,7 @@ async function npyLoadStackFile(filename, subdir) {
 
   if(subdir) {
     const lr = await api('cam_list_captures', subdir);
-    _npyStackFiles = (lr && lr.files) ? lr.files.map(f => f.name).filter(n => n.startsWith('stack_')) : [];
+    _npyStackFiles = (lr && lr.files) ? lr.files.map(f => f.name).filter(n => n.startsWith('stack_')).reverse() : [];
   } else {
     _npyStackFiles = [];
   }
@@ -4297,6 +4657,7 @@ async function obsbotStopSequence() {
 onEvent("onObsbotProgress", function(name, idx, total, status) {
   document.getElementById("obsbotSeqProgress").textContent =
     `[${idx+1}/${total}] ${name}: ${status}`;
+  logMsg(`OBSBOT [${idx+1}/${total}] ${name}: ${status}`, "sys");
 });
 
 onEvent("onObsbotSequenceDone", function(filenames, error) {
@@ -4304,10 +4665,12 @@ onEvent("onObsbotSequenceDone", function(filenames, error) {
   document.getElementById("obsbotSeqBadge").classList.remove("on");
   if(error) {
     document.getElementById("obsbotSeqProgress").textContent = "Error: " + error;
+    logMsg("OBSBOT sequence error: "+error, "error");
   } else {
     document.getElementById("obsbotSeqProgress").textContent =
       "Done: " + (filenames ? filenames.length : 0) + " captures";
     toast("Sequence complete", "success");
+    logMsg("OBSBOT sequence complete: "+(filenames ? filenames.length : 0)+" captures", "sys");
   }
 });
 
