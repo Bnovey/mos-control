@@ -28,7 +28,7 @@ MASTERS_DIR = os.path.join(CONFIG_DIR, "masters")
 os.makedirs(MODULES_DIR, exist_ok=True)
 os.makedirs(MASTERS_DIR, exist_ok=True)
 
-MODULES = ("camera", "presets", "timeline", "cavro", "obsbot")
+MODULES = ("camera", "imaging", "timeline", "cavro", "obsbot")
 for _m in MODULES:
     os.makedirs(os.path.join(MODULES_DIR, _m), exist_ok=True)
 

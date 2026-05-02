@@ -549,10 +549,10 @@ option { background:#fff; }
       <section id="panel-scope-setup" class="panel">
         <div class="panel-title">Microscope Setup</div>
         <div class="module-cfg-picker">
-          <label>Presets</label>
-          <select id="cfgPicker_presets"></select>
-          <button class="btn btn-sm" onclick="moduleCfgLoad('presets')">Load</button>
-          <button class="btn btn-sm accent" onclick="moduleCfgSaveAs('presets')">Save As</button>
+          <label>Imaging</label>
+          <select id="cfgPicker_imaging"></select>
+          <button class="btn btn-sm" onclick="moduleCfgLoad('imaging')">Load</button>
+          <button class="btn btn-sm accent" onclick="moduleCfgSaveAs('imaging')">Save As</button>
         </div>
         <div class="scope-grid">
 
@@ -669,13 +669,34 @@ option { background:#fff; }
             </div>
           </div>
 
-          <!-- Microscope Presets -->
+          <!-- Imaging Presets (microscope + camera in one preset) -->
           <div class="card" style="grid-column:1/-1">
-            <div class="card-head"><span class="title">Microscope Presets</span></div>
+            <div class="card-head"><span class="title">Imaging Presets</span>
+              <span style="font-size:10px;color:var(--text3)">Microscope state + exposure + binning + color</span></div>
             <div class="section">
-              <div class="field">
-                <input type="text" id="msPresetName" placeholder="Preset name" style="flex:1;min-width:120px">
-                <button class="btn btn-sm accent" onclick="msSavePreset()">Save Current</button>
+              <div class="field" style="flex-wrap:wrap;gap:6px">
+                <input type="text" id="imgPresetName" placeholder="Preset name" style="flex:1;min-width:120px">
+                <label style="font-size:10px">Exp (ms)</label>
+                <input type="number" id="imgPresetExposure" value="50" min="1" style="width:70px">
+                <label style="font-size:10px">Bin</label>
+                <select id="imgPresetBinning" style="width:50px">
+                  <option value="1">1×</option>
+                  <option value="2">2×</option>
+                  <option value="4">4×</option>
+                  <option value="8">8×</option>
+                </select>
+                <select id="imgPresetColor" style="width:80px;font-size:11px" onchange="imgUpdateSwatch()">
+                  <option value="auto">Auto</option>
+                  <option value="none">Gray</option>
+                  <option value="blue">Blue</option>
+                  <option value="green">Green</option>
+                  <option value="red">Red</option>
+                  <option value="cyan">Cyan</option>
+                  <option value="magenta">Magenta</option>
+                  <option value="yellow">Yellow</option>
+                </select>
+                <span id="imgPresetSwatch" style="display:inline-block;width:14px;height:14px;border:1px solid var(--border);border-radius:3px;vertical-align:middle;background:#888"></span>
+                <button class="btn btn-sm accent" onclick="imagingSavePreset()">Save Current</button>
               </div>
               <div class="preset-list" id="msPresetList"></div>
             </div>
@@ -745,40 +766,6 @@ option { background:#fff; }
                 <input type="text" id="camSaveDirInput" placeholder="Path" style="flex:1">
                 <button class="btn btn-sm" onclick="camSetSaveDir()">Set</button>
               </div>
-            </div>
-          </div>
-
-          <!-- Acquisition Presets -->
-          <div class="card" style="grid-column:1/-1">
-            <div class="card-head"><span class="title">Acquisition Presets</span>
-              <span style="font-size:10px;color:var(--text3)">Scope preset + exposure + binning</span></div>
-            <div class="section">
-              <div class="field">
-                <input type="text" id="acqPresetName" placeholder="Preset name" style="flex:1;min-width:100px">
-                <select id="acqMsPreset" style="min-width:100px" onchange="acqUpdateSwatch()"><option value="">Scope preset...</option></select>
-                <label style="font-size:10px">Exp (ms)</label>
-                <input type="number" id="acqExposure" value="50" min="1" style="width:70px">
-                <label style="font-size:10px">Bin</label>
-                <select id="acqBinning" style="width:50px">
-                  <option value="1">1×</option>
-                  <option value="2">2×</option>
-                  <option value="4">4×</option>
-                  <option value="8">8×</option>
-                </select>
-                <select id="acqColor" style="width:80px;font-size:11px" onchange="acqUpdateSwatch()">
-                  <option value="auto">Auto</option>
-                  <option value="none">Gray</option>
-                  <option value="blue">Blue</option>
-                  <option value="green">Green</option>
-                  <option value="red">Red</option>
-                  <option value="cyan">Cyan</option>
-                  <option value="magenta">Magenta</option>
-                  <option value="yellow">Yellow</option>
-                </select>
-                <span id="acqColorSwatch" style="display:inline-block;width:14px;height:14px;border:1px solid var(--border);border-radius:3px;vertical-align:middle;background:#888"></span>
-                <button class="btn btn-sm accent" onclick="acqSavePreset()">Save</button>
-              </div>
-              <div class="preset-list" id="acqPresetList"></div>
             </div>
           </div>
 
@@ -2001,6 +1988,7 @@ function markerDelete(id) {
   if(!confirm(`Delete marker '${m.name}'?`)) return;
   markersSave(markersGetAll().filter(x => x.id !== id));
   refreshLiveMarkerDropdown();
+  _persistImaging();
 }
 
 async function liveMarkCurrentPrompt() {
@@ -2023,6 +2011,7 @@ async function liveMarkCurrentPrompt() {
     });
     markersSave(arr);
     refreshLiveMarkerDropdown();
+    _persistImaging();
     toast(`Marked: ${name}`,"success");
     logMsg(`Marker added: ${name}`,"sys");
   } catch(e) { toast("Mark failed: "+e.message,"error"); }
@@ -2487,11 +2476,38 @@ const _memStore = {};
 function _loadStore(key) { return _memStore[key] || {}; }
 function _saveStore(key, obj) { _memStore[key] = obj; }
 
-/* Microscope presets */
-function msSavePreset() {
-  const name = document.getElementById("msPresetName").value.trim();
+/* Imaging presets (microscope state + exposure + binning + color, all-in-one) */
+const _ACQ_COLOR_HEX = {
+  none:'#888888', blue:'#3b82f6', green:'#22c55e', red:'#ef4444',
+  cyan:'#06b6d4', magenta:'#d946ef', yellow:'#eab308'
+};
+const _FILTER_CUBE_COLOR = {1:'none', 2:'blue', 3:'green', 4:'red'};
+const _FILTER_CUBE_NAME  = {1:'DIA', 2:'DAPI', 3:'GFP', 4:'TxRed'};
+
+function imgAutoColor(filterPos) {
+  return _FILTER_CUBE_COLOR[filterPos] || 'none';
+}
+function imgResolveColor(preset) {
+  if(!preset) return 'none';
+  if(preset.color && preset.color !== 'auto') return preset.color;
+  return imgAutoColor(preset.filter);
+}
+function imgUpdateSwatch() {
+  const swatch = document.getElementById("imgPresetSwatch");
+  if(!swatch) return;
+  const explicit = document.getElementById("imgPresetColor").value;
+  let resolved = explicit;
+  if(explicit === 'auto') {
+    const f = parseInt(document.getElementById("scopeFilter").value);
+    resolved = imgAutoColor(f);
+  }
+  swatch.style.background = _ACQ_COLOR_HEX[resolved] || '#888';
+}
+
+function imagingSavePreset() {
+  const name = document.getElementById("imgPresetName").value.trim();
   if(!name){ toast("Enter a preset name","error"); return; }
-  const obj = _loadStore("mosaic_ms_presets");
+  const obj = _loadStore("mosaic_imaging_presets");
   obj[name] = {
     objective: parseInt(document.getElementById("scopeNosepiece").value),
     filter: parseInt(document.getElementById("scopeFilter").value),
@@ -2500,188 +2516,115 @@ function msSavePreset() {
     shutterOpen: _shutterOpen,
     ilNd: parseInt(document.getElementById("ilNdSelect").value),
     ilShutterOpen: _intensiOn,
+    exposure_ms: parseInt(document.getElementById("imgPresetExposure").value) || 50,
+    binning: parseInt(document.getElementById("imgPresetBinning").value) || 1,
+    color: document.getElementById("imgPresetColor").value || 'auto',
   };
-  _saveStore("mosaic_ms_presets", obj);
-  document.getElementById("msPresetName").value = "";
+  _saveStore("mosaic_imaging_presets", obj);
+  document.getElementById("imgPresetName").value = "";
   renderMsPresets();
-  refreshAcqDropdowns();
-  toast("Microscope preset saved","success");
-  logMsg("Microscope preset saved: "+name,"sys");
+  _persistImaging();
+  toast("Imaging preset saved","success");
+  logMsg("Imaging preset saved: "+name,"sys");
 }
-async function msLoadPreset(name) {
-  const obj = _loadStore("mosaic_ms_presets");
+
+async function imagingLoadPreset(name) {
+  const obj = _loadStore("mosaic_imaging_presets");
   const p = obj[name]; if(!p) return;
-  if(!scopeTiConnected){ toast("Connect Ti first","error"); return; }
-  const tasks = [api('ti_apply_preset', p.objective, p.filter, p.lampIntensity,
-                      p.lampOn != null ? !!p.lampOn : null,
-                      p.shutterOpen != null ? !!p.shutterOpen : null)];
+  const tasks = [];
+  if(scopeTiConnected) {
+    tasks.push(api('ti_apply_preset', p.objective, p.filter, p.lampIntensity,
+                    p.lampOn != null ? !!p.lampOn : null,
+                    p.shutterOpen != null ? !!p.shutterOpen : null));
+  }
   if(p.ilNd != null && _ilConnected) tasks.push(api('il_nd_set', p.ilNd));
   if(p.ilShutterOpen != null && _ilConnected) {
     tasks.push(p.ilShutterOpen ? api('il_shutter_open') : api('il_shutter_close'));
   }
+  if(scopeCamConnected) {
+    if(p.exposure_ms) tasks.push(api('cam_set_exposure', p.exposure_ms));
+    if(p.binning) tasks.push(api('cam_set_binning', p.binning));
+  }
   await Promise.all(tasks);
-  if(p.lampOn != null) { _lampOn = !!p.lampOn; updateLampBadge(); }
-  if(p.shutterOpen != null) { _shutterOpen = !!p.shutterOpen; updateShutterBadge(); }
-  if(p.ilShutterOpen != null) { _intensiOn = !!p.ilShutterOpen; updateIntensiBadge(); document.getElementById("ilShutterState").textContent = _intensiOn ? "Open" : "Closed"; }
-  scopeRefreshTi();
+  if(scopeTiConnected) {
+    if(p.lampOn != null) { _lampOn = !!p.lampOn; updateLampBadge(); }
+    if(p.shutterOpen != null) { _shutterOpen = !!p.shutterOpen; updateShutterBadge(); }
+  }
+  if(p.ilShutterOpen != null && _ilConnected) {
+    _intensiOn = !!p.ilShutterOpen; updateIntensiBadge();
+    const il = document.getElementById("ilShutterState");
+    if(il) il.textContent = _intensiOn ? "Open" : "Closed";
+  }
+  if(scopeTiConnected) scopeRefreshTi();
   toast("Loaded: "+name,"success");
-  logMsg("Microscope preset loaded: "+name,"sys");
+  logMsg("Imaging preset loaded: "+name,"sys");
 }
-function msEditPreset(name) {
-  const obj = _loadStore("mosaic_ms_presets");
+
+function imagingEditPreset(name) {
+  const obj = _loadStore("mosaic_imaging_presets");
   const p = obj[name]; if(!p) return;
-  document.getElementById("msPresetName").value = name;
+  document.getElementById("imgPresetName").value = name;
+  document.getElementById("imgPresetExposure").value = p.exposure_ms ?? 50;
+  document.getElementById("imgPresetBinning").value = p.binning ?? 1;
+  document.getElementById("imgPresetColor").value = p.color || 'auto';
   document.getElementById("scopeNosepiece").value = p.objective;
   document.getElementById("scopeFilter").value = p.filter;
   document.getElementById("scopeLampSlider").value = p.lampIntensity ?? 2;
   document.getElementById("scopeLampVal").textContent = p.lampIntensity ?? 2;
   _lampOn = !!p.lampOn; updateLampBadge();
   _shutterOpen = !!p.shutterOpen; updateShutterBadge();
-  document.getElementById("ilNdSelect").value = p.ilNd ?? 0;
+  const nd = document.getElementById("ilNdSelect");
+  if(nd) nd.value = p.ilNd ?? 0;
   if(p.ilShutterOpen != null) { _intensiOn = !!p.ilShutterOpen; updateIntensiBadge(); }
+  imgUpdateSwatch();
   toast("Editing: " + name, "info");
 }
-function msDeletePreset(name) {
-  const obj = _loadStore("mosaic_ms_presets");
+
+function imagingDeletePreset(name) {
+  const obj = _loadStore("mosaic_imaging_presets");
   delete obj[name];
-  _saveStore("mosaic_ms_presets", obj);
+  _saveStore("mosaic_imaging_presets", obj);
   renderMsPresets();
-  refreshAcqDropdowns();
+  _persistImaging();
 }
+
 function renderMsPresets() {
-  const obj = _loadStore("mosaic_ms_presets");
+  const obj = _loadStore("mosaic_imaging_presets");
   const el = document.getElementById("msPresetList");
+  if(!el) return;
   const objNames = {1:'2×',2:'4×',3:'4×F',4:'10×',5:'20×',6:'40×'};
   el.innerHTML = Object.keys(obj).map(n => {
     const p = obj[n];
+    const cubeName = _FILTER_CUBE_NAME[p.filter] || ('F'+p.filter);
     const lamp = p.lampOn ? `Lamp:On/${p.lampIntensity??0}` : `Lamp:Off`;
-    const shtr = p.shutterOpen != null ? (p.shutterOpen ? ' Sh:Open' : ' Sh:Closed') : '';
-    const ilSh = p.ilShutterOpen != null ? (p.ilShutterOpen ? ' IL:Open' : ' IL:Closed') : '';
-    const safeName = n.replace(/'/g, "\\'");
-    return `<div class="preset-chip" onclick="msEditPreset('${safeName}')">
-      <span>${n}</span>
-      <span style="font-size:10px;color:var(--text3)">Obj:${objNames[p.objective]||p.objective} F:${p.filter} ${lamp}${shtr}${ilSh} ND:${p.ilNd??'-'}</span>
-      <button class="btn btn-sm" onclick="event.stopPropagation();msLoadPreset('${safeName}')" title="Apply to hardware" style="padding:1px 6px;font-size:9px">Apply</button>
-      <span class="del" onclick="event.stopPropagation();msDeletePreset('${safeName}')">&times;</span>
-    </div>`;
-  }).join("") || '<span style="font-size:11px;color:var(--text3)">No presets saved</span>';
-}
-
-/* Acquisition presets (scope preset + exposure + binning) */
-function acqSavePreset() {
-  const name = document.getElementById("acqPresetName").value.trim();
-  const ms = document.getElementById("acqMsPreset").value;
-  const exposure = parseInt(document.getElementById("acqExposure").value) || 50;
-  const binning = parseInt(document.getElementById("acqBinning").value) || 1;
-  const color = document.getElementById("acqColor").value || 'auto';
-  if(!name){ toast("Enter a name","error"); return; }
-  if(!ms){ toast("Select a scope preset","error"); return; }
-  const obj = _loadStore("mosaic_acq_presets");
-  obj[name] = { microscopePreset: ms, exposure_ms: exposure, binning: binning, color: color };
-  _saveStore("mosaic_acq_presets", obj);
-  document.getElementById("acqPresetName").value = "";
-  renderAcqPresets();
-  toast("Acquisition preset saved","success");
-  logMsg("Acquisition preset saved: "+name,"sys");
-}
-function acqDeletePreset(name) {
-  const obj = _loadStore("mosaic_acq_presets");
-  delete obj[name];
-  _saveStore("mosaic_acq_presets", obj);
-  renderAcqPresets();
-}
-function acqEditPreset(name) {
-  const obj = _loadStore("mosaic_acq_presets");
-  const p = obj[name]; if(!p) return;
-  document.getElementById("acqPresetName").value = name;
-  document.getElementById("acqMsPreset").value = p.microscopePreset || '';
-  document.getElementById("acqExposure").value = p.exposure_ms || 50;
-  document.getElementById("acqBinning").value = p.binning || 1;
-  document.getElementById("acqColor").value = p.color || 'auto';
-  acqUpdateSwatch();
-}
-const _ACQ_COLOR_HEX = {
-  none:'#888888', blue:'#3b82f6', green:'#22c55e', red:'#ef4444',
-  cyan:'#06b6d4', magenta:'#d946ef', yellow:'#eab308'
-};
-const _FILTER_CUBE_COLOR = {1:'none', 2:'blue', 3:'green', 4:'red'};
-const _FILTER_CUBE_NAME  = {1:'DIA', 2:'DAPI', 3:'GFP', 4:'TxRed'};
-function acqAutoColor(msPresetName) {
-  const msObj = _loadStore("mosaic_ms_presets");
-  const m = msObj[msPresetName];
-  return m ? (_FILTER_CUBE_COLOR[m.filter] || 'none') : 'none';
-}
-function acqResolveColor(msPresetName, explicitColor) {
-  if(explicitColor && explicitColor !== 'auto') return explicitColor;
-  return acqAutoColor(msPresetName);
-}
-function acqUpdateSwatch() {
-  const swatch = document.getElementById("acqColorSwatch");
-  const msName = document.getElementById("acqMsPreset").value;
-  const explicit = document.getElementById("acqColor").value;
-  const color = acqResolveColor(msName, explicit);
-  if(swatch) {
-    swatch.style.background = _ACQ_COLOR_HEX[color] || '#888';
-  }
-}
-async function acqLoadPreset(name) {
-  const obj = _loadStore("mosaic_acq_presets");
-  const p = obj[name]; if(!p) return;
-  document.getElementById("acqPresetName").value = name;
-  document.getElementById("acqExposure").value = p.exposure_ms || 50;
-  document.getElementById("acqBinning").value = p.binning || 1;
-  document.getElementById("acqMsPreset").value = p.microscopePreset || '';
-  document.getElementById("acqColor").value = p.color || 'auto';
-  acqUpdateSwatch();
-  const tasks = [];
-  if(p.microscopePreset) tasks.push(msLoadPreset(p.microscopePreset));
-  if(scopeCamConnected) {
-    tasks.push(api('cam_set_exposure', p.exposure_ms));
-    tasks.push(api('cam_set_binning', p.binning || 1));
-  }
-  await Promise.all(tasks);
-  toast("Loaded: "+name,"success");
-}
-function renderAcqPresets() {
-  const obj = _loadStore("mosaic_acq_presets");
-  const msObj = _loadStore("mosaic_ms_presets");
-  const el = document.getElementById("acqPresetList");
-  el.innerHTML = Object.keys(obj).map(n => {
-    const p = obj[n];
-    const m = msObj[p.microscopePreset];
-    const resolvedColor = acqResolveColor(p.microscopePreset, p.color);
-    const cubeName = m ? (_FILTER_CUBE_NAME[m.filter] || 'DIA') : '?';
+    const ilSh = p.ilShutterOpen ? ' IL:Open' : '';
+    const resolvedColor = imgResolveColor(p);
     const swatchHex = _ACQ_COLOR_HEX[resolvedColor] || '#888';
-    return `<div class="preset-chip" onclick="acqLoadPreset('${n}')">
+    const safeName = n.replace(/'/g, "\\'");
+    return `<div class="preset-chip" onclick="imagingEditPreset('${safeName}')">
       <span>${n}</span>
       <span style="display:inline-block;width:10px;height:10px;background:${swatchHex};border-radius:2px;vertical-align:middle;margin:0 2px" title="${cubeName}"></span>
-      <span style="font-size:10px;color:var(--text3)">${cubeName} — ${p.exposure_ms}ms ${p.binning}x</span>
-      <span class="edit" onclick="event.stopPropagation();acqEditPreset('${n}')">&#9998;</span>
-      <span class="del" onclick="event.stopPropagation();acqDeletePreset('${n}')">&times;</span>
+      <span style="font-size:10px;color:var(--text3)">${cubeName} Obj:${objNames[p.objective]||p.objective} ND:${p.ilNd??'-'}${ilSh} ${lamp} — ${p.exposure_ms}ms ${p.binning}×</span>
+      <button class="btn btn-sm" onclick="event.stopPropagation();imagingLoadPreset('${safeName}')" title="Apply to hardware" style="padding:1px 6px;font-size:9px">Apply</button>
+      <span class="del" onclick="event.stopPropagation();imagingDeletePreset('${safeName}')">&times;</span>
     </div>`;
-  }).join("") || '<span style="font-size:11px;color:var(--text3)">No acquisition presets</span>';
-}
-function refreshAcqDropdowns() {
-  const msObj = _loadStore("mosaic_ms_presets");
-  const msSel = document.getElementById("acqMsPreset");
-  msSel.innerHTML = '<option value="">Scope preset...</option>' +
-    Object.keys(msObj).map(n=>`<option value="${n}">${n}</option>`).join("");
+  }).join("") || '<span style="font-size:11px;color:var(--text3)">No imaging presets</span>';
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    MODULAR CONFIGURATION
-   - 6 module configs: camera, microscope, presets, timeline, cavro, obsbot
+   - 5 module configs: camera, imaging, timeline, cavro, obsbot
    - Master configs reference module configs by name (mix-and-match)
    - Per-panel pickers let you swap a single module mid-session
    ═══════════════════════════════════════════════════════════════════════════ */
-const CFG_MODULES = ["camera", "presets", "timeline", "cavro", "obsbot"];
+const CFG_MODULES = ["camera", "imaging", "timeline", "cavro", "obsbot"];
 const CFG_MODULE_LABELS = {
-  camera: "Camera", presets: "Presets",
+  camera: "Camera", imaging: "Imaging",
   timeline: "Timeline", cavro: "Cavro", obsbot: "OBSBOT"
 };
 
 let _activeMaster = null;   // name of currently loaded master (or null)
-let _activeModule = { camera:null, presets:null,
+let _activeModule = { camera:null, imaging:null,
                       timeline:null, cavro:null, obsbot:null };
 
 // ── Per-module gather/restore ───────────────────────────────────────────────
@@ -2706,21 +2649,37 @@ async function camRestoreConfig(p) {
   }
 }
 
-function presetsGatherConfig() {
+function imagingGatherConfig() {
   return {
-    microscopePresets:  _loadStore("mosaic_ms_presets") || {},
-    acquisitionPresets: _loadStore("mosaic_acq_presets") || {},
-    markers:            _loadStore("mosaic_markers") || [],
+    imagingPresets: _loadStore("mosaic_imaging_presets") || {},
+    markers:        _loadStore("mosaic_markers") || [],
   };
 }
-function presetsRestoreConfig(p) {
+
+/* Auto-persist imaging presets + markers to the active imaging config on
+   every change. If no imaging config is active, save as "default". */
+let _imagingSaveDebounce = null;
+function _persistImaging() {
+  if(_imagingSaveDebounce) clearTimeout(_imagingSaveDebounce);
+  _imagingSaveDebounce = setTimeout(async () => {
+    _imagingSaveDebounce = null;
+    const name = _activeModule.imaging || "default";
+    const payload = imagingGatherConfig();
+    try {
+      const r = await api('config_module_save', 'imaging', name, payload);
+      if(r && r.error) { logMsg("Imaging autosave error: "+r.error,"error"); return; }
+      _activeModule.imaging = name;
+      refreshModulePicker('imaging');
+    } catch(e) {
+      logMsg("Imaging autosave failed: "+e.message,"error");
+    }
+  }, 300);  // debounce: collapse rapid edits into one write
+}
+function imagingRestoreConfig(p) {
   if(!p) return;
-  if(p.microscopePresets) _saveStore("mosaic_ms_presets",  p.microscopePresets);
-  if(p.acquisitionPresets) _saveStore("mosaic_acq_presets", p.acquisitionPresets);
+  if(p.imagingPresets) _saveStore("mosaic_imaging_presets", p.imagingPresets);
   if(Array.isArray(p.markers)) _saveStore("mosaic_markers", p.markers);
   renderMsPresets();
-  renderAcqPresets();
-  refreshAcqDropdowns();
   if(typeof refreshLiveMarkerDropdown === 'function') refreshLiveMarkerDropdown();
 }
 
@@ -2789,7 +2748,7 @@ async function obsbotRestoreConfig(p) {
 
 const MODULE_HANDLERS = {
   camera:     { gather: camGatherConfig,    restore: camRestoreConfig },
-  presets:    { gather: presetsGatherConfig,restore: presetsRestoreConfig },
+  imaging:    { gather: imagingGatherConfig,restore: imagingRestoreConfig },
   timeline:   { gather: tlGatherConfig,     restore: tlRestoreConfig },
   cavro:      { gather: cavroGatherConfig,  restore: cavroRestoreConfig },
   obsbot:     { gather: obsbotGatherConfig, restore: obsbotRestoreConfig },
@@ -3585,10 +3544,10 @@ function _tlStartDrag(e, ev, mode, lane, pps) {
 
 /* ── Editor panel ── */
 function tlRefreshEditorDropdowns() {
-  const acqObj = _loadStore("mosaic_acq_presets");
+  const imgObj = _loadStore("mosaic_imaging_presets");
   const acqSel = document.getElementById("tlEdAcqPreset");
   acqSel.innerHTML = '<option value="">None</option>' +
-    Object.keys(acqObj).map(n=>`<option value="${n}">${n}</option>`).join("");
+    Object.keys(imgObj).map(n=>`<option value="${n}">${n}</option>`).join("");
 }
 
 function tlEventOverhead(ev) {
@@ -3879,8 +3838,8 @@ function tlOpenEditor(ev) {
     }
 
     if(ev.type === 'video') {
-      const acqObj = _loadStore("mosaic_acq_presets");
-      const a = acqObj[ev.acqPreset] || {};
+      const imgObj = _loadStore("mosaic_imaging_presets");
+      const a = imgObj[ev.acqPreset] || {};
       const expMs = a.exposure_ms || null;
       const maxFps = expMs ? Math.floor(1000 / expMs) : 120;
       const curFps = ev.fps || 30;
@@ -3894,15 +3853,13 @@ function tlOpenEditor(ev) {
       <div id="tlFpsWarn" style="font-size:10px;color:var(--red);margin-top:2px;${fpsWarn ? '' : 'display:none'}">${fpsWarn ? `⚠ ${curFps} fps requires <${Math.ceil(1000/curFps)}ms exposure — preset is ${expMs}ms` : ''}</div>
       ${tlMarkerEditorHtml(ev)}`;
     } else if(ev.type === 'stack') {
-      const acqObj = _loadStore("mosaic_acq_presets");
-      const msObj  = _loadStore("mosaic_ms_presets");
-      const acqNames = Object.keys(acqObj);
+      const imgObj = _loadStore("mosaic_imaging_presets");
+      const acqNames = Object.keys(imgObj);
       const selPresets = ev.stackPresets || [];
       let rows = selPresets.map((p, i) => {
-        const a = acqObj[p] || {};
-        const m = msObj[a.microscopePreset] || {};
-        const cube = _FILTER_CUBE_NAME[m.filter] || '?';
-        const resolvedC = acqResolveColor(a.microscopePreset, a.color);
+        const a = imgObj[p] || {};
+        const cube = _FILTER_CUBE_NAME[a.filter] || '?';
+        const resolvedC = imgResolveColor(a);
         const swHex = _ACQ_COLOR_HEX[resolvedC] || '#888';
         return `<tr>
           <td style="padding:2px 4px"><span style="display:inline-block;width:8px;height:8px;background:${swHex};border-radius:2px;vertical-align:middle;margin-right:4px"></span>${p}</td>
@@ -3968,10 +3925,10 @@ function tlMarkerEditorHtml(ev) {
 function tlStackCalcDuration(ev) {
   const presets = ev.stackPresets || [];
   if(!presets.length) return 2;
-  const acqObj = _loadStore("mosaic_acq_presets");
+  const imgObj = _loadStore("mosaic_imaging_presets");
   let total = 0;
   for(const pn of presets) {
-    const a = acqObj[pn] || {};
+    const a = imgObj[pn] || {};
     total += 1.5 + ((a.exposure_ms || 50) / 1000);
   }
   total += 0.5;
@@ -4185,8 +4142,8 @@ function tlEditorChanged() {
     if(intv) ev.interval = parseInt(intv.value) || 1000;
 
     if(ev.type === 'video' && fps) {
-      const acqObj = _loadStore("mosaic_acq_presets");
-      const a = acqObj[ev.acqPreset] || {};
+      const imgObj = _loadStore("mosaic_imaging_presets");
+      const a = imgObj[ev.acqPreset] || {};
       const expMs = a.exposure_ms || null;
       const maxFps = expMs ? Math.floor(1000 / expMs) : 120;
       const warn = document.getElementById("tlFpsWarn");
@@ -4233,35 +4190,34 @@ document.addEventListener("click", e => {
 });
 
 /* ── Execution engine ── */
-async function tlApplyMsPreset(presetName) {
-  const ms = _loadStore("mosaic_ms_presets");
-  const p = ms[presetName];
-  if(!p || !scopeTiConnected) return;
-  const tasks = [api('ti_apply_preset', p.objective, p.filter,
-                      p.lampIntensity ?? null,
-                      p.lampOn != null ? !!p.lampOn : null,
-                      p.shutterOpen != null ? !!p.shutterOpen : null)];
+async function tlApplyImagingPreset(presetName) {
+  const obj = _loadStore("mosaic_imaging_presets");
+  const p = obj[presetName]; if(!p) return;
+  const tasks = [];
+  if(scopeTiConnected) {
+    tasks.push(api('ti_apply_preset', p.objective, p.filter,
+                    p.lampIntensity ?? null,
+                    p.lampOn != null ? !!p.lampOn : null,
+                    p.shutterOpen != null ? !!p.shutterOpen : null));
+  }
   if(p.ilNd != null && _ilConnected) tasks.push(api('il_nd_set', p.ilNd));
   if(p.ilShutterOpen != null && _ilConnected) {
     tasks.push(p.ilShutterOpen ? api('il_shutter_open') : api('il_shutter_close'));
   }
-  await Promise.all(tasks);
-  if(p.lampOn != null) { _lampOn = !!p.lampOn; updateLampBadge(); }
-  if(p.shutterOpen != null) { _shutterOpen = !!p.shutterOpen; updateShutterBadge(); }
-  if(p.ilShutterOpen != null) { _intensiOn = !!p.ilShutterOpen; updateIntensiBadge(); }
-}
-
-async function tlApplyAcqPreset(presetName) {
-  const acq = _loadStore("mosaic_acq_presets");
-  const a = acq[presetName]; if(!a) return;
-  const tasks = [tlApplyMsPreset(a.microscopePreset)];
   if(scopeCamConnected) {
-    if(a.exposure_ms != null) tasks.push(api('cam_set_exposure', a.exposure_ms));
-    if(a.binning != null) tasks.push(api('cam_set_binning', a.binning));
+    if(p.exposure_ms != null) tasks.push(api('cam_set_exposure', p.exposure_ms));
+    if(p.binning != null) tasks.push(api('cam_set_binning', p.binning));
   }
-  const color = acqResolveColor(a.microscopePreset, a.color);
+  const color = imgResolveColor(p);
   tasks.push(api('cam_set_pseudo_color', color));
   await Promise.all(tasks);
+  if(scopeTiConnected) {
+    if(p.lampOn != null) { _lampOn = !!p.lampOn; updateLampBadge(); }
+    if(p.shutterOpen != null) { _shutterOpen = !!p.shutterOpen; updateShutterBadge(); }
+  }
+  if(p.ilShutterOpen != null && _ilConnected) {
+    _intensiOn = !!p.ilShutterOpen; updateIntensiBadge();
+  }
 }
 
 async function tlMoveToMarker(ev) {
@@ -4281,12 +4237,7 @@ async function tlMoveToMarker(ev) {
 }
 
 async function tlApplyPresets(ev) {
-  if(ev.acqPreset) await tlApplyAcqPreset(ev.acqPreset);
-  else if(ev.msPreset) {
-    await tlApplyMsPreset(ev.msPreset);
-    const color = acqResolveColor(ev.msPreset);
-    await api('cam_set_pseudo_color', color);
-  }
+  if(ev.acqPreset) await tlApplyImagingPreset(ev.acqPreset);
 }
 
 function tlSleep(ms) {
@@ -4393,20 +4344,18 @@ async function tlRunCycle(sorted, progress) {
             const presetNames = ev.stackPresets && ev.stackPresets.length ? ev.stackPresets : [];
             if(presetNames.length) {
               progress.textContent = `${ev.name}: capturing ${presetNames.length} channels...`;
-              const acqStore = _loadStore("mosaic_acq_presets");
-              const msStore  = _loadStore("mosaic_ms_presets");
+              const imgStore = _loadStore("mosaic_imaging_presets");
               const channels = presetNames.map(pn => {
-                const a = acqStore[pn]; if(!a) return null;
-                const m = msStore[a.microscopePreset] || {};
+                const p = imgStore[pn]; if(!p) return null;
                 return {
-                  objective: m.objective ?? null, filter: m.filter ?? null,
-                  lamp_intensity: m.lampIntensity ?? null,
-                  lamp_on: m.lampOn != null ? !!m.lampOn : null,
-                  shutter_open: m.shutterOpen != null ? !!m.shutterOpen : null,
-                  il_shutter_open: m.ilShutterOpen != null ? !!m.ilShutterOpen : null,
-                  il_nd: m.ilNd ?? null,
-                  exposure_ms: a.exposure_ms ?? null, binning: a.binning ?? 1,
-                  color: acqResolveColor(a.microscopePreset, a.color)
+                  objective: p.objective ?? null, filter: p.filter ?? null,
+                  lamp_intensity: p.lampIntensity ?? null,
+                  lamp_on: p.lampOn != null ? !!p.lampOn : null,
+                  shutter_open: p.shutterOpen != null ? !!p.shutterOpen : null,
+                  il_shutter_open: p.ilShutterOpen != null ? !!p.ilShutterOpen : null,
+                  il_nd: p.ilNd ?? null,
+                  exposure_ms: p.exposure_ms ?? null, binning: p.binning ?? 1,
+                  color: imgResolveColor(p)
                 };
               }).filter(Boolean);
               await api('cam_stack_capture', channels, !!ev.keepShutterOpen);
@@ -4587,13 +4536,24 @@ function tlClearAll() {
   buildPumps();
   refreshPorts();
   renderMsPresets();
-  renderAcqPresets();
-  refreshAcqDropdowns();
   tlRender();
   tlUpdateTotalTime();
   logMsg("Mosaic Control Center ready","sys");
 
   await refreshAllModulePickers();
+
+  // Auto-load the most recently saved imaging config so presets + markers
+  // persist across page reloads without needing manual Save As.
+  try {
+    const r = await api('config_module_list', 'imaging');
+    const list = (r && r.configs) || [];
+    if(list.length) {
+      const pick = list.slice().sort(
+        (a,b) => (b.saved||"").localeCompare(a.saved||""))[0];
+      if(pick) await moduleCfgLoad('imaging', pick.name);
+    }
+  } catch(e) { /* nonfatal */ }
+
   await renderConfigPanel();
   await cfgStartupPrompt();
 })();
